@@ -1,1 +1,344 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nuestra Tienda</title>
+<meta property="og:title" content="Nuestra Tienda · Ofertas y productos">
+<meta property="og:description" content="Mira nuestro catálogo, ofertas y compra fácil.">
+<meta name="theme-color" content="#0f766e">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
+<style>
+  :root { --brand:#0f766e; --accent:#f59e0b; }
+  body { -webkit-tap-highlight-color: transparent; padding-bottom: 90px; }
+  .btn { min-height:48px; border-radius:14px; font-weight:600; padding:0 18px; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-brand { background:var(--brand); color:#fff; }
+  .btn-soft { background:#e5e7eb; color:#111827; }
+  .btn-wa { background:#16a34a; color:#fff; }
+  .input { width:100%; min-height:48px; border:1.5px solid #d1d5db; border-radius:12px; padding:10px 14px; font-size:16px; background:#fff; }
+  .input:focus { outline:none; border-color:var(--brand); }
+  .card { background:#fff; border-radius:18px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .sheet { animation: up .22s ease-out; } @keyframes up { from { transform:translateY(40px); opacity:0 } to { transform:none; opacity:1 } }
+  label.lbl { display:block; font-size:13px; font-weight:600; color:#4b5563; margin:12px 0 4px; }
+  .hscroll { display:flex; gap:12px; overflow-x:auto; padding:0 16px 8px; scroll-snap-type:x mandatory; }
+  .hscroll > * { scroll-snap-align:start; flex:0 0 auto; }
+  .hscroll::-webkit-scrollbar { display:none; }
+  .chip { padding:8px 14px; border-radius:999px; background:#fff; font-size:14px; white-space:nowrap; border:1.5px solid #e5e7eb; }
+  .chip.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .clamp2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .opt { border:2px solid #e5e7eb; border-radius:14px; padding:12px 14px; display:flex; gap:10px; align-items:center; background:#fff; }
+  .opt.on { border-color:var(--brand); background:#f0fdfa; }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
 
+<header class="sticky top-0 z-30 bg-[var(--brand)] text-white px-4 py-3 flex items-center gap-3 shadow">
+  <img id="hLogo" class="w-11 h-11 rounded-full bg-white object-cover hidden" alt="">
+  <div id="hName" class="flex-1 font-bold text-lg truncate">Tienda</div>
+  <button onclick="openCart()" class="relative text-2xl w-12 h-12" aria-label="Carrito">🛒
+    <span id="cartBadge" class="hidden absolute top-0 right-0 bg-[var(--accent)] text-black text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">0</span>
+  </button>
+</header>
+
+<main id="app" class="max-w-3xl mx-auto"><p class="p-8 text-center text-gray-500">Cargando…</p></main>
+
+<a id="waFloat" class="hidden fixed right-4 bottom-24 z-40 w-14 h-14 rounded-full bg-green-600 text-white text-3xl shadow-lg flex items-center justify-center" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
+
+<div id="cartBar" class="hidden fixed bottom-0 inset-x-0 z-40 p-3" style="padding-bottom:calc(12px + env(safe-area-inset-bottom))">
+  <button onclick="openCart()" class="btn btn-brand w-full shadow-xl text-lg"><span id="cartBarTxt"></span></button>
+</div>
+
+<div id="modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-end sm:items-center justify-center">
+  <div id="modalBody" class="sheet bg-gray-50 w-full sm:max-w-lg max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-5"></div>
+</div>
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-28 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-full hidden"></div>
+
+<script>
+/* ============================== UTILIDADES ============================== */
+const CFG = window.APP_CONFIG || {};
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '$' + Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const price = p => Number(p.offer_price || p.price || 0);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 2400); }
+function thumb(u, w = 600) { return u && u.includes('/upload/f_auto,q_auto/') ? u.replace('/upload/f_auto,q_auto/', `/upload/f_auto,q_auto,w_${w}/`) : (u || ''); }
+function normPhone(p, cc) {
+  let d = String(p || '').replace(/\D/g, ''); if (!d) return ''; cc = cc || '58';
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.startsWith('0')) d = cc + d.slice(1); else if (d.length <= 10 && !d.startsWith(cc)) d = cc + d;
+  return d;
+}
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+function openModal(html) {
+  const b = $('#modalBody'), st = b.scrollTop, was = !$('#modal').classList.contains('hidden');
+  b.innerHTML = html; $('#modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  b.scrollTop = was ? st : 0;
+}
+function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; $('#modalBody').innerHTML = ''; }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Copiado ✔'), () => toast('No se pudo copiar'));
+});
+
+/* ================================ DATOS ================================= */
+const sb = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase) ? supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+const S = { settings: {}, products: [], cats: [], cat: '', q: '', cart: lsGet('mk_cart', []),
+  F: { delivery: '', pay: '', name: '', phone: '', email: '', address: '', ref: '', optin: false, proof: '' } };
+
+async function load() {
+  if (sb) {
+    const [s, p] = await Promise.all([
+      sb.from('business_settings').select('*').eq('id', 'main').maybeSingle(),
+      sb.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1000)]);
+    if (p.error) throw p.error;
+    S.settings = s.data || {}; S.products = p.data || [];
+  } else {
+    S.settings = lsGet('mk_settings', {}); S.products = lsGet('mk_products', []).filter(p => p.is_active !== false);
+  }
+  S.cats = [...new Set(S.products.map(p => p.category).filter(Boolean))];
+  S.cart = S.cart.filter(c => S.products.some(p => p.id === c.id));
+  saveCart();
+}
+
+/* ================================ MARCA ================================= */
+function applyBrand() {
+  const s = S.settings;
+  document.documentElement.style.setProperty('--brand', s.color_primary || '#0f766e');
+  document.documentElement.style.setProperty('--accent', s.color_accent || '#f59e0b');
+  document.querySelector('meta[name=theme-color]').content = s.color_primary || '#0f766e';
+  $('#hName').textContent = s.business_name || 'Tienda'; document.title = s.business_name || 'Tienda';
+  const l = $('#hLogo'); if (s.logo_url) { l.src = thumb(s.logo_url, 120); l.classList.remove('hidden'); }
+  const wa = $('#waFloat');
+  if (s.whatsapp) { wa.href = `https://wa.me/${normPhone(s.whatsapp, s.country_code)}?text=${encodeURIComponent('Hola, tengo una consulta sobre sus productos 👋')}`; wa.classList.remove('hidden'); }
+}
+
+/* ================================ CARRITO =============================== */
+const saveCart = () => { lsSet('mk_cart', S.cart); updateBar(); };
+const lines = () => S.cart.map(c => ({ p: S.products.find(x => x.id === c.id), qty: c.qty })).filter(l => l.p);
+const total = () => lines().reduce((a, l) => a + price(l.p) * l.qty, 0);
+function updateBar() {
+  const n = S.cart.reduce((a, c) => a + c.qty, 0);
+  $('#cartBadge').textContent = n; $('#cartBadge').classList.toggle('hidden', !n);
+  $('#cartBar').classList.toggle('hidden', !n);
+  $('#waFloat').style.bottom = n ? '96px' : '24px';
+  $('#cartBarTxt').textContent = `Ver carrito (${n}) · ${money(total())}`;
+}
+function addCart(id, qty = 1) {
+  const c = S.cart.find(x => x.id === id); if (c) c.qty = Math.min(99, c.qty + qty); else S.cart.push({ id, qty });
+  saveCart(); toast('Agregado al carrito 🛒');
+}
+function buyNow(id) { if (!S.cart.some(c => c.id === id)) addCart(id); openCart(); }
+function chg(id, d) {
+  const c = S.cart.find(x => x.id === id); if (!c) return;
+  c.qty += d; if (c.qty <= 0) S.cart = S.cart.filter(x => x.id !== id);
+  saveCart(); if (!lines().length) { closeModal(); toast('Carrito vacío'); } else renderCart();
+}
+
+/* ============================== CATÁLOGO ================================ */
+function card(p, mode) {
+  const off = p.offer_price && Number(p.offer_price) < Number(p.price);
+  const btn = mode === 'offer'
+    ? `<button class="btn btn-brand w-full mt-2" onclick="event.stopPropagation();openProduct('${esc(p.id)}')">Ver oferta</button>`
+    : `<button class="btn btn-brand w-full mt-2" onclick="event.stopPropagation();buyNow('${esc(p.id)}')">Comprar ahora</button>`;
+  return `<div class="card overflow-hidden ${mode === 'offer' ? 'w-44' : ''}" onclick="openProduct('${esc(p.id)}')">
+    <div class="relative aspect-square bg-gray-200">
+      <img src="${esc(thumb(p.image_url))}" loading="lazy" alt="${esc(p.name)}" class="w-full h-full object-cover" onerror="this.style.visibility='hidden'">
+      ${off ? `<span class="absolute top-2 left-2 bg-[var(--accent)] text-black text-xs font-bold px-2 py-1 rounded-full">Oferta</span>` : ''}
+      ${p.video_url ? `<span class="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">🎬 Video</span>` : ''}
+    </div>
+    <div class="p-3"><div class="font-semibold text-sm clamp2 min-h-[2.5rem]">${esc(p.name)}</div>
+      <div class="mt-1"><b style="color:var(--brand)" class="text-lg">${money(price(p))}</b>${off ? ` <s class="text-xs text-gray-400">${money(p.price)}</s>` : ''}</div>${btn}</div></div>`;
+}
+function videoInfo(u) {
+  u = (u || '').trim(); if (!u) return null;
+  const m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+  if (m) return { type: 'yt', id: m[1], thumb: `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` };
+  if (/\.(mp4|webm|mov)(\?|$)/i.test(u)) return { type: 'file' };
+  return { type: 'link' };
+}
+function renderHome() {
+  $('#app').innerHTML = `
+    <div class="px-4 pt-4"><input id="q" class="input" placeholder="🔎 Buscar productos" value="${esc(S.q)}">
+      <div id="chips" class="flex gap-2 overflow-x-auto py-3"></div></div>
+    <section id="secOffers"></section><section id="secVideos"></section>
+    <section class="px-4 pb-4"><h2 class="font-bold text-lg mb-2">Catálogo</h2><div id="grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div></section>
+    <footer class="text-center text-xs text-gray-500 pb-6 px-4">${esc(S.settings.business_name || '')} ${S.settings.address ? '· ' + esc(S.settings.address) : ''}</footer>`;
+  $('#q').addEventListener('input', e => { S.q = e.target.value; renderSections(); });
+  renderSections();
+}
+function renderSections() {
+  $('#chips').innerHTML = ['Todos', ...S.cats].map((c, i) => `<button class="chip ${(i === 0 && !S.cat) || c === S.cat ? 'on' : ''}" onclick="setCat(${i})">${esc(c)}</button>`).join('');
+  const q = S.q.trim().toLowerCase(), filtering = q || S.cat;
+  const list = S.products.filter(p => (!S.cat || p.category === S.cat) && (!q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q)));
+  const offers = S.products.filter(p => p.is_featured || (p.offer_price && Number(p.offer_price) < Number(p.price)));
+  const vids = S.products.filter(p => p.video_url);
+  $('#secOffers').innerHTML = !filtering && offers.length ? `<h2 class="font-bold text-lg px-4 mb-2">🔥 Ofertas especiales</h2><div class="hscroll">${offers.map(p => card(p, 'offer')).join('')}</div>` : '';
+  $('#secVideos').innerHTML = !filtering && vids.length ? `<h2 class="font-bold text-lg px-4 mt-4 mb-2">🎬 Videos promocionales</h2><div class="hscroll">${vids.map(p => {
+    const v = videoInfo(p.video_url), img = v.thumb || thumb(p.image_url);
+    return `<div class="card overflow-hidden w-64" onclick="openProduct('${esc(p.id)}', true)"><div class="relative aspect-video bg-gray-800"><img src="${esc(img)}" loading="lazy" class="w-full h-full object-cover opacity-90" alt="" onerror="this.style.visibility='hidden'"><span class="absolute inset-0 flex items-center justify-center text-5xl text-white drop-shadow">▶</span></div><div class="p-3 text-sm font-semibold clamp2">${esc(p.name)}</div></div>`;
+  }).join('')}</div>` : '';
+  $('#grid').innerHTML = list.map(p => card(p)).join('') || '<p class="col-span-full text-center text-gray-500 py-8">No encontramos productos.</p>';
+}
+function setCat(i) { S.cat = i === 0 ? '' : S.cats[i - 1]; renderSections(); }
+
+function videoHtml(url) {
+  const v = videoInfo(url); if (!v) return '';
+  if (v.type === 'yt') return `<div class="aspect-video rounded-2xl overflow-hidden mt-3 bg-black"><iframe class="w-full h-full" src="https://www.youtube.com/embed/${v.id}?rel=0&playsinline=1" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;
+  if (v.type === 'file') return `<video class="w-full rounded-2xl mt-3 bg-black" controls playsinline preload="metadata" src="${esc(url)}"></video>`;
+  return `<a class="btn btn-soft w-full mt-3" href="${esc(url)}" target="_blank" rel="noopener">🎬 Ver video promocional</a>`;
+}
+function openProduct(id, focusVideo) {
+  const p = S.products.find(x => x.id === id); if (!p) return;
+  const off = p.offer_price && Number(p.offer_price) < Number(p.price), wa = S.settings.whatsapp;
+  openModal(`
+    <div class="flex justify-end"><button class="text-2xl px-2" onclick="closeModal()" aria-label="Cerrar">✕</button></div>
+    ${focusVideo ? videoHtml(p.video_url) : ''}
+    ${p.image_url ? `<img src="${esc(thumb(p.image_url, 900))}" class="w-full rounded-2xl mt-1 object-cover max-h-[50vh]" alt="${esc(p.name)}">` : ''}
+    <h3 class="font-bold text-xl mt-3">${esc(p.name)}</h3>
+    <div class="mt-1"><b class="text-2xl" style="color:var(--brand)">${money(price(p))}</b>${off ? ` <s class="text-gray-400">${money(p.price)}</s>` : ''}</div>
+    ${p.description ? `<p class="mt-2 text-gray-700" style="white-space:pre-line">${esc(p.description)}</p>` : ''}
+    ${!focusVideo ? videoHtml(p.video_url) : ''}
+    <div class="grid grid-cols-2 gap-2 mt-4">
+      <button class="btn btn-soft" onclick="addCart('${esc(p.id)}')">＋ Al carrito</button>
+      <button class="btn btn-brand" onclick="closeModal();buyNow('${esc(p.id)}')">Comprar ahora</button>
+    </div>
+    ${wa ? `<a class="btn btn-wa w-full mt-2" target="_blank" rel="noopener" href="https://wa.me/${normPhone(wa, S.settings.country_code)}?text=${encodeURIComponent('Hola, me interesa: ' + p.name)}">💬 Preguntar por WhatsApp</a>` : ''}`);
+}
+
+/* =============================== CHECKOUT =============================== */
+function deliveryOpts() { const s = S.settings, o = []; if (s.accepts_pickup !== false) o.push('pickup'); if (s.accepts_delivery !== false) o.push('delivery'); return o.length ? o : ['pickup']; }
+function payOpts() {
+  const s = S.settings, o = [];
+  if (s.pm_bank || s.pm_phone) o.push('pago_movil'); if (s.tr_account) o.push('transferencia'); o.push('whatsapp'); return o;
+}
+const PAY_LABEL = { pago_movil: '📱 Pago Móvil', transferencia: '🏦 Transferencia bancaria', whatsapp: '💬 Acuerdo por WhatsApp' };
+function openCart() {
+  if (!lines().length) return toast('Tu carrito está vacío');
+  const F = S.F;
+  if (!deliveryOpts().includes(F.delivery)) F.delivery = deliveryOpts()[0];
+  if (!payOpts().includes(F.pay)) F.pay = payOpts()[0];
+  renderCart();
+}
+function syncForm() {
+  const g = id => { const e = $('#' + id); return e ? e.value : null; }, F = S.F;
+  if (!$('#fName')) return;
+  F.name = g('fName'); F.phone = g('fPhone'); F.email = g('fEmail'); F.address = g('fAddr') ?? F.address; F.ref = g('fRef') ?? F.ref;
+  F.optin = $('#fOpt').checked;
+}
+function setDelivery(v) { syncForm(); S.F.delivery = v; renderCart(); }
+function setPay(v) { syncForm(); S.F.pay = v; renderCart(); }
+function row(l, v) { return `<div class="flex items-center justify-between gap-2 py-1 border-b border-gray-200 last:border-0"><span class="text-gray-500 text-sm">${l}</span><span class="flex items-center gap-2"><b class="text-sm text-right">${esc(v)}</b><button type="button" data-copy="${esc(v)}" class="text-xs px-2 py-1 bg-gray-200 rounded-lg">Copiar</button></span></div>`; }
+function payDetails() {
+  const s = S.settings, F = S.F;
+  if (F.pay === 'pago_movil') return `<div class="card p-3 mt-2">${row('Banco', s.pm_bank || '-')}${row('Cédula / RIF', s.pm_id_doc || '-')}${row('Teléfono', s.pm_phone || '-')}${row('Monto', money(total()))}</div>`;
+  if (F.pay === 'transferencia') return `<div class="card p-3 mt-2">${row('Banco', s.tr_bank || '-')}${row('Cuenta', s.tr_account || '-')}${row('Titular', s.tr_holder || '-')}${row('Cédula / RIF', s.tr_id_doc || '-')}${row('Monto', money(total()))}</div>`;
+  return `<p class="text-sm text-gray-600 mt-2">Al confirmar te daremos un botón para escribirnos por WhatsApp y acordar el pago.</p>`;
+}
+function renderCart() {
+  syncForm();
+  const F = S.F, s = S.settings, cl = !!(CFG.CLOUDINARY_CLOUD_NAME && CFG.CLOUDINARY_UPLOAD_PRESET);
+  openModal(`
+    <div class="flex items-center justify-between"><h3 class="font-bold text-xl">Tu pedido</h3><button class="text-2xl px-2" onclick="closeModal()" aria-label="Cerrar">✕</button></div>
+    <div class="space-y-2 mt-3">${lines().map(({ p, qty }) => `
+      <div class="card p-2 flex items-center gap-3">
+        <img src="${esc(thumb(p.image_url, 160))}" class="w-16 h-16 rounded-xl object-cover bg-gray-200" alt="" onerror="this.style.visibility='hidden'">
+        <div class="flex-1 min-w-0"><div class="text-sm font-semibold clamp2">${esc(p.name)}</div><div class="text-sm" style="color:var(--brand)"><b>${money(price(p) * qty)}</b></div></div>
+        <div class="flex items-center gap-1"><button class="w-9 h-9 rounded-full bg-gray-200 text-lg" onclick="chg('${esc(p.id)}',-1)">−</button><b class="w-6 text-center">${qty}</b><button class="w-9 h-9 rounded-full bg-gray-200 text-lg" onclick="chg('${esc(p.id)}',1)">＋</button></div>
+      </div>`).join('')}</div>
+    <div class="flex justify-between text-xl font-bold mt-3"><span>Total</span><span style="color:var(--brand)">${money(total())}</span></div>
+
+    <h4 class="font-bold mt-5 mb-2">Entrega</h4>
+    <div class="space-y-2">${deliveryOpts().map(d => `<label class="opt ${F.delivery === d ? 'on' : ''}"><input type="radio" name="dl" class="w-5 h-5" ${F.delivery === d ? 'checked' : ''} onchange="setDelivery('${d}')"> ${d === 'pickup' ? '🏪 Retiro en tienda' : '🚚 Envío a domicilio / Delivery'}</label>`).join('')}</div>
+    ${F.delivery === 'delivery' ? `<label class="lbl">Dirección de entrega</label><textarea id="fAddr" rows="2" class="input" placeholder="Calle, casa/edificio, punto de referencia">${esc(F.address)}</textarea>`
+      : (s.address ? `<p class="text-sm text-gray-600 mt-2">📍 Retiras en: ${esc(s.address)}</p>` : '')}
+
+    <h4 class="font-bold mt-5 mb-2">Forma de pago</h4>
+    <div class="space-y-2">${payOpts().map(m => `<label class="opt ${F.pay === m ? 'on' : ''}"><input type="radio" name="py" class="w-5 h-5" ${F.pay === m ? 'checked' : ''} onchange="setPay('${m}')"> ${PAY_LABEL[m]}</label>`).join('')}</div>
+    ${payDetails()}
+    ${F.pay !== 'whatsapp' ? `<label class="lbl">Número de referencia del pago</label><input id="fRef" class="input" inputmode="numeric" value="${esc(F.ref)}" placeholder="Ej: 123456">
+      ${cl ? `<label class="lbl">Comprobante (opcional)</label><label class="btn btn-soft w-full cursor-pointer">📎 Adjuntar captura<input type="file" accept="image/*" class="hidden" onchange="pickProof(this)"></label><div id="proofSt" class="text-xs text-gray-500 mt-1">${F.proof ? '✅ Comprobante adjunto' : ''}</div>` : `<p class="text-xs text-gray-500 mt-1">Después de pagar, te pediremos la captura por WhatsApp.</p>`}` : ''}
+
+    <h4 class="font-bold mt-5 mb-1">Tus datos</h4>
+    <label class="lbl">Nombre</label><input id="fName" class="input" autocomplete="name" value="${esc(F.name)}">
+    <label class="lbl">Teléfono / WhatsApp</label><input id="fPhone" type="tel" class="input" autocomplete="tel" placeholder="0412 1234567" value="${esc(F.phone)}">
+    <label class="lbl">Correo electrónico</label><input id="fEmail" type="email" class="input" autocomplete="email" value="${esc(F.email)}">
+    <label class="flex items-start gap-3 mt-4 text-sm"><input id="fOpt" type="checkbox" class="w-6 h-6 mt-0.5 shrink-0" ${F.optin ? 'checked' : ''}> <span>Deseo recibir ofertas exclusivas, promociones y novedades por WhatsApp y correo electrónico</span></label>
+    <button id="btnOrder" class="btn btn-brand w-full mt-5 text-lg" onclick="submitOrder()">Confirmar pedido · ${money(total())}</button>`);
+}
+
+function compress(file, max = 1280, q = 0.8) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const r = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => { URL.revokeObjectURL(url); b ? res(b) : rej(new Error('Error al comprimir')); }, 'image/jpeg', q); };
+    img.onerror = () => rej(new Error('Imagen inválida')); img.src = url;
+  });
+}
+async function pickProof(inp) {
+  const f = inp.files[0]; if (!f) return; const st = $('#proofSt'); st.textContent = 'Subiendo…';
+  try {
+    const fd = new FormData(); fd.append('file', await compress(f)); fd.append('upload_preset', CFG.CLOUDINARY_UPLOAD_PRESET);
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${CFG.CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+    const j = await r.json(); if (!j.secure_url) throw new Error('Falló la subida');
+    S.F.proof = j.secure_url; st.textContent = '✅ Comprobante adjunto';
+  } catch (e) { st.textContent = '❌ ' + e.message; }
+}
+
+async function submitOrder() {
+  syncForm(); const F = S.F, s = S.settings, cc = s.country_code;
+  const phone = normPhone(F.phone, cc), email = (F.email || '').trim();
+  if (!lines().length) return toast('Tu carrito está vacío');
+  if (!F.name.trim()) return toast('Escribe tu nombre');
+  if (phone.length < 10) return toast('Escribe un teléfono válido');
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return toast('Correo no válido');
+  if (F.delivery === 'delivery' && !F.address.trim()) return toast('Escribe la dirección de entrega');
+  if (F.pay !== 'whatsapp' && !F.ref.trim() && !F.proof) return toast('Agrega la referencia del pago');
+  const btn = $('#btnOrder'); btn.disabled = true; btn.textContent = 'Enviando…';
+  const items = lines().map(l => ({ product_id: l.p.id, qty: l.qty }));
+  const snap = { lines: lines().map(l => ({ name: l.p.name, qty: l.qty, price: price(l.p) })), total: total() };
+  try {
+    let id;
+    if (sb) {
+      const { data, error } = await sb.rpc('place_order', { p_name: F.name.trim(), p_phone: phone, p_email: email, p_consent: F.optin, p_items: items,
+        p_delivery_type: F.delivery, p_address: F.delivery === 'delivery' ? F.address.trim() : null, p_payment_method: F.pay, p_payment_ref: F.ref.trim() || null, p_proof_url: F.proof || null });
+      if (error) throw error; id = data;
+    } else {   // modo demo
+      const cs = lsGet('mk_customers', []); let c = cs.find(x => x.phone === phone);
+      if (!c) { c = { id: uid(), name: F.name.trim(), phone, email: email || null, marketing_consent: F.optin, source: 'tienda', created_at: new Date().toISOString() }; cs.unshift(c); }
+      else if (F.optin) c.marketing_consent = true;
+      lsSet('mk_customers', cs); id = uid();
+      const os = lsGet('mk_orders', []); os.unshift({ id, customer_id: c.id, customer_name: c.name, customer_phone: phone, total: snap.total, status: 'pendiente',
+        delivery_type: F.delivery, payment_method: F.pay, payment_ref: F.ref, payment_proof_url: F.proof, created_at: new Date().toISOString() }); lsSet('mk_orders', os);
+    }
+    S.cart = []; saveCart(); showDone(String(id), snap, F, phone);
+  } catch (e) { btn.disabled = false; btn.textContent = 'Confirmar pedido'; toast('No se pudo enviar: ' + (e.message || e)); }
+}
+function showDone(id, snap, F, phone) {
+  const code = id.slice(0, 8).toUpperCase(), s = S.settings;
+  const msg = `Hola, hice el pedido #${code} en ${s.business_name || 'la tienda'}:\n` + snap.lines.map(l => `• ${l.qty} x ${l.name} (${money(l.price)})`).join('\n') +
+    `\nTotal: ${money(snap.total)}\nEntrega: ${F.delivery === 'delivery' ? 'Delivery - ' + F.address : 'Retiro en tienda'}\nPago: ${PAY_LABEL[F.pay].replace(/^\S+\s/, '')}${F.ref ? ' (Ref ' + F.ref + ')' : ''}\nNombre: ${F.name}`;
+  const wa = s.whatsapp ? `https://wa.me/${normPhone(s.whatsapp, s.country_code)}?text=${encodeURIComponent(msg)}` : '';
+  openModal(`<div class="text-center py-4"><div class="text-6xl">🎉</div><h3 class="font-bold text-2xl mt-2">¡Pedido recibido!</h3>
+    <p class="text-gray-600 mt-1">Código: <b>#${esc(code)}</b></p><p class="text-xl font-bold mt-2" style="color:var(--brand)">${money(snap.total)}</p>
+    <p class="text-sm text-gray-600 mt-3">${F.pay === 'whatsapp' ? 'Escríbenos por WhatsApp para acordar el pago.' : 'Verificaremos tu pago y te confirmaremos pronto.'}</p>
+    ${wa ? `<a class="btn btn-wa w-full mt-4" target="_blank" rel="noopener" href="${wa}">💬 Enviar pedido por WhatsApp</a>` : ''}
+    <button class="btn btn-soft w-full mt-2" onclick="closeModal()">Seguir comprando</button></div>`);
+  S.F.ref = ''; S.F.proof = ''; S.F.address = '';
+}
+
+/* ================================ ARRANQUE ============================== */
+(async function start() {
+  try {
+    await load(); applyBrand(); updateBar(); renderHome();
+    const pid = new URLSearchParams(location.search).get('p'); if (pid) openProduct(pid);
+  } catch (e) { $('#app').innerHTML = `<div class="m-4 p-4 card text-red-700">No se pudo cargar la tienda: ${esc(e.message || e)}</div>`; }
+})();
+</script>
+</body>
+</html>

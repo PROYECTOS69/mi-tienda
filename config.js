@@ -1,4 +1,4 @@
-ya// Configuración del panel. Sin credenciales funciona en MODO DEMO (datos en el teléfono).
+// Configuración del panel. Sin credenciales funciona en MODO DEMO (datos en el teléfono).
 window.APP_CONFIG = {.
   // Supabase (Settings > API) 
   SUPABASE_URL: "https://cifkzcijpjmnxhesqdtw.supabase.co",

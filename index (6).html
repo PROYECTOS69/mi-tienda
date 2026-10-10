@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Panel Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root { --brand:#0f766e; --accent:#f59e0b; }
+  body { -webkit-tap-highlight-color: transparent; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .btn { min-height:48px; border-radius:14px; font-weight:600; padding:0 18px; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-brand { background:var(--brand); color:#fff; }
+  .btn-soft { background:#e5e7eb; color:#111827; }
+  .btn-wa { background:#16a34a; color:#fff; }
+  .input { width:100%; min-height:48px; border:1.5px solid #d1d5db; border-radius:12px; padding:10px 14px; font-size:16px; background:#fff; }
+  .input:focus { outline:none; border-color:var(--brand); }
+  .card { background:#fff; border-radius:18px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .tab-on { color:var(--brand); } .tab-on .dot { background:var(--brand); }
+  .sheet { animation: up .22s ease-out; } @keyframes up { from { transform:translateY(40px); opacity:0 } to { transform:none; opacity:1 } }
+  label.lbl { display:block; font-size:13px; font-weight:600; color:#4b5563; margin:12px 0 4px; }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<header id="topbar" class="sticky top-0 z-30 bg-[var(--brand)] text-white px-4 pt-3 pb-3 flex items-center gap-3 shadow">
+  <img id="hLogo" class="w-10 h-10 rounded-full bg-white object-cover hidden" alt="">
+  <div class="flex-1 min-w-0">
+    <div id="hName" class="font-bold truncate">Panel Admin</div>
+    <div id="hMode" class="text-xs opacity-80"></div>
+  </div>
+  <button id="btnLogout" class="text-sm underline hidden">Salir</button>
+</header>
+
+<main id="view" class="p-4 max-w-2xl mx-auto"></main>
+
+<nav class="fixed bottom-0 inset-x-0 z-30 bg-white border-t flex justify-around" style="padding-bottom:env(safe-area-inset-bottom)">
+  <button data-tab="home" class="flex-1 py-2 flex flex-col items-center text-xs text-gray-500"><span class="text-2xl">🏠</span>Inicio</button>
+  <button data-tab="products" class="flex-1 py-2 flex flex-col items-center text-xs text-gray-500"><span class="text-2xl">🛍️</span>Productos</button>
+  <button data-tab="customers" class="flex-1 py-2 flex flex-col items-center text-xs text-gray-500"><span class="text-2xl">👥</span>Clientes</button>
+  <button data-tab="offers" class="flex-1 py-2 flex flex-col items-center text-xs text-gray-500"><span class="text-2xl">📣</span>Ofertas</button>
+  <button data-tab="settings" class="flex-1 py-2 flex flex-col items-center text-xs text-gray-500"><span class="text-2xl">⚙️</span>Ajustes</button>
+</nav>
+
+<div id="modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-end sm:items-center justify-center">
+  <div id="modalBody" class="sheet bg-gray-50 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-5"></div>
+</div>
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-full hidden"></div>
+
+<script>
+/* ============================== UTILIDADES ============================== */
+const CFG = window.APP_CONFIG || {};
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '$' + Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 2200); }
+function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').classList.remove('hidden'); }
+function closeModal() { $('#modal').classList.add('hidden'); }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+function normPhone(p, cc) {
+  let d = String(p || '').replace(/\D/g, '');
+  if (!d) return '';
+  cc = cc || '58';
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.startsWith('0')) d = cc + d.slice(1);       // 0412... -> 58412...
+  else if (d.length <= 10 && !d.startsWith(cc)) d = cc + d;
+  return d;
+}
+
+/* ============================ CAPA DE DATOS ============================= */
+// Con credenciales usa Supabase; sin ellas funciona en modo demo (localStorage).
+const sb = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase)
+  ? supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+
+const store = {
+  async list(t, limit = 5000) {
+    if (sb) { const { data, error } = await sb.from(t).select('*').order('created_at', { ascending: false }).limit(limit); if (error) throw error; return data; }
+    return JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+  },
+  async save(t, row) {
+    row = { ...row };
+    if (sb) {
+      if (!row.id) delete row.id;
+      const { data, error } = await sb.from(t).upsert(row).select().single(); if (error) throw error; return data;
+    }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+    if (!row.id) { row.id = uid(); row.created_at = new Date().toISOString(); all.unshift(row); }
+    else { const i = all.findIndex(x => x.id === row.id); if (i >= 0) all[i] = { ...all[i], ...row }; else all.unshift(row); }
+    localStorage.setItem('mk_' + t, JSON.stringify(all)); return row;
+  },
+  async saveMany(t, rows) {
+    if (sb) {
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from(t).upsert(rows.slice(i, i + 500), { onConflict: 'phone', ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+    const seen = new Set(all.map(x => x.phone || x.email));
+    rows.forEach(r => { const k = r.phone || r.email; if (k && seen.has(k)) return; seen.add(k); all.unshift({ ...r, id: uid(), created_at: new Date().toISOString() }); });
+    localStorage.setItem('mk_' + t, JSON.stringify(all));
+  },
+  async remove(t, id) {
+    if (sb) { const { error } = await sb.from(t).delete().eq('id', id); if (error) throw error; return; }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]').filter(x => x.id !== id);
+    localStorage.setItem('mk_' + t, JSON.stringify(all));
+  },
+  async getSettings() {
+    if (sb) { const { data } = await sb.from('business_settings').select('*').eq('id', 'main').maybeSingle(); return data || {}; }
+    return JSON.parse(localStorage.getItem('mk_settings') || '{}');
+  },
+  async saveSettings(s) {
+    s = { ...s, id: 'main', updated_at: new Date().toISOString() };
+    if (sb) { const { error } = await sb.from('business_settings').upsert(s); if (error) throw error; return; }
+    localStorage.setItem('mk_settings', JSON.stringify(s));
+  }
+};
+
+/* ===================== SUBIDA DE IMÁGENES + COMPRESIÓN ================== */
+// Comprime en el teléfono (máx 1280px, JPEG 80%) antes de subir => cargas ultrarrápidas.
+function compressImage(file, maxSize = 1280, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const r = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => { URL.revokeObjectURL(url); b ? resolve(b) : reject(new Error('No se pudo comprimir')); }, 'image/jpeg', quality);
+    };
+    img.onerror = () => reject(new Error('Imagen inválida'));
+    img.src = url;
+  });
+}
+const blobToDataURL = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+
+async function uploadImage(file) {
+  const blob = await compressImage(file);
+  if (CFG.CLOUDINARY_CLOUD_NAME && CFG.CLOUDINARY_UPLOAD_PRESET) {
+    const fd = new FormData(); fd.append('file', blob); fd.append('upload_preset', CFG.CLOUDINARY_UPLOAD_PRESET);
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${CFG.CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+    const j = await r.json(); if (!j.secure_url) throw new Error('Falló la subida a Cloudinary');
+    return j.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');   // entrega optimizada
+  }
+  if (sb) {
+    const path = `products/${uid()}.jpg`;
+    const { error } = await sb.storage.from('media').upload(path, blob, { contentType: 'image/jpeg' });
+    if (error) throw error;
+    return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  }
+  return await blobToDataURL(blob);   // modo demo
+}
+
+/* ============================== ESTADO ================================== */
+const S = { tab: 'home', settings: {}, products: [], customers: [], orders: [], custLimit: 40, custQuery: '', custFilter: 'all' };
+
+function applyBrand() {
+  const s = S.settings;
+  document.documentElement.style.setProperty('--brand', s.color_primary || '#0f766e');
+  document.documentElement.style.setProperty('--accent', s.color_accent || '#f59e0b');
+  $('#hName').textContent = s.business_name || 'Panel Admin';
+  const l = $('#hLogo'); if (s.logo_url) { l.src = s.logo_url; l.classList.remove('hidden'); } else l.classList.add('hidden');
+  $('#hMode').textContent = sb ? 'Conectado a Supabase' : 'Modo demo (datos locales)';
+}
+
+async function loadAll() {
+  [S.settings, S.products, S.customers, S.orders] = await Promise.all([store.getSettings(), store.list('products'), store.list('customers', 20000), store.list('orders', 2000)]);
+  applyBrand();
+}
+
+function go(tab) {
+  S.tab = tab;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-on', b.dataset.tab === tab));
+  ({ home: vHome, products: vProducts, customers: vCustomers, offers: vOffers, settings: vSettings })[tab]();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => go(b.dataset.tab)));
+
+const view = html => { $('#view').innerHTML = html; };
+const waLink = (phone, text) => `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+
+/* =============================== INICIO ================================= */
+function vHome() {
+  const optin = S.customers.filter(c => c.marketing_consent).length;
+  const pend = S.orders.filter(o => o.status === 'pendiente');
+  const ventas = S.orders.filter(o => o.status !== 'cancelado').reduce((a, o) => a + Number(o.total || 0), 0);
+  const stat = (n, l, ic) => `<div class="card p-4"><div class="text-2xl">${ic}</div><div class="text-2xl font-bold">${n}</div><div class="text-xs text-gray-500">${l}</div></div>`;
+  view(`
+    <div class="grid grid-cols-2 gap-3">
+      ${stat(S.products.length, 'Productos', '🛍️')}${stat(S.customers.length, 'Clientes', '👥')}
+      ${stat(optin, 'Aceptan ofertas', '✅')}${stat(money(ventas), 'Ventas', '💰')}
+    </div>
+    <h2 class="font-bold mt-6 mb-2">Pedidos pendientes (${pend.length})</h2>
+    <div class="space-y-3">${pend.slice(0, 15).map(o => `
+      <div class="card p-4">
+        <div class="flex justify-between"><b>${esc(o.customer_name)}</b><b>${money(o.total)}</b></div>
+        <div class="text-xs text-gray-500 mt-1">${o.delivery_type === 'delivery' ? '🚚 Delivery' : '🏪 Retiro'} · ${esc(o.payment_method || '')} ${o.payment_ref ? '· Ref ' + esc(o.payment_ref) : ''}</div>
+        ${o.payment_proof_url ? `<a class="text-xs underline" style="color:var(--brand)" href="${esc(o.payment_proof_url)}" target="_blank">Ver comprobante</a>` : ''}
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-brand flex-1" onclick="setOrder('${o.id}','pagado')">Confirmar pago</button>
+          <button class="btn btn-soft" onclick="setOrder('${o.id}','cancelado')">✕</button>
+        </div>
+      </div>`).join('') || '<p class="text-sm text-gray-500">Sin pedidos pendientes.</p>'}</div>
+    ${!S.products.length && !sb ? `<button class="btn btn-soft w-full mt-6" onclick="seedDemo()">Cargar datos de ejemplo</button>` : ''}
+  `);
+}
+async function setOrder(id, status) {
+  const o = S.orders.find(x => x.id === id); o.status = status; await store.save('orders', o); toast('Pedido ' + status); vHome();
+}
+async function seedDemo() {
+  await store.save('products', { name: 'Zapatillas Urban', description: 'Cómodas y ligeras', price: 35, category: 'Calzado', is_active: true, is_featured: true });
+  await store.saveMany('customers', [
+    { name: 'María Pérez', phone: '584121112233', email: 'maria@mail.com', marketing_consent: true, source: 'manual' },
+    { name: 'José Rojas', phone: '584143334455', email: '', marketing_consent: true, source: 'manual' }]);
+  await loadAll(); go('home'); toast('Datos de ejemplo cargados');
+}
+
+/* ============================== PRODUCTOS =============================== */
+function vProducts() {
+  view(`
+    <div class="flex items-center justify-between mb-3"><h2 class="font-bold text-lg">Catálogo</h2>
+      <button class="btn btn-brand" onclick="editProduct()">＋ Nuevo</button></div>
+    <div class="space-y-3">${S.products.map(p => `
+      <div class="card p-3 flex gap-3 items-center" onclick="editProduct('${p.id}')">
+        <img src="${esc(p.image_url || '')}" onerror="this.style.visibility='hidden'" loading="lazy" class="w-20 h-20 rounded-xl object-cover bg-gray-200" alt="">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold truncate">${esc(p.name)}</div>
+          <div class="text-sm text-gray-500 truncate">${esc(p.category || 'Sin categoría')}</div>
+          <div class="font-bold" style="color:var(--brand)">${money(p.offer_price || p.price)} ${p.offer_price ? `<s class="text-xs text-gray-400">${money(p.price)}</s>` : ''}</div>
+          <div class="text-xs">${p.is_featured ? '🔥 Oferta ' : ''}${p.video_url ? '🎬 ' : ''}${p.is_active === false ? '🚫 Oculto' : ''}</div>
+        </div>
+      </div>`).join('') || '<p class="text-sm text-gray-500">Aún no hay productos. Toca “Nuevo”.</p>'}</div>`);
+}
+let _img = '';
+function editProduct(id) {
+  const p = S.products.find(x => x.id === id) || { is_active: true };
+  _img = p.image_url || '';
+  openModal(`
+    <h3 class="font-bold text-lg mb-2">${id ? 'Editar' : 'Nuevo'} producto</h3>
+    <div class="flex items-center gap-3">
+      <img id="pImg" src="${esc(_img)}" class="w-24 h-24 rounded-2xl object-cover bg-gray-200" alt="">
+      <div class="flex-1 space-y-2">
+        <label class="btn btn-brand w-full cursor-pointer">📷 Tomar foto<input type="file" accept="image/*" capture="environment" class="hidden" onchange="pickImg(this)"></label>
+        <label class="btn btn-soft w-full cursor-pointer">🖼️ Galería<input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
+      </div>
+    </div>
+    <div id="pStatus" class="text-xs text-gray-500 mt-1"></div>
+    <label class="lbl">Título</label><input id="pName" class="input" value="${esc(p.name)}">
+    <label class="lbl">Descripción</label><textarea id="pDesc" rows="3" class="input">${esc(p.description)}</textarea>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="lbl">Precio</label><input id="pPrice" type="number" inputmode="decimal" step="0.01" class="input" value="${p.price ?? ''}"></div>
+      <div><label class="lbl">Precio oferta</label><input id="pOffer" type="number" inputmode="decimal" step="0.01" class="input" value="${p.offer_price ?? ''}"></div>
+    </div>
+    <label class="lbl">Categoría</label><input id="pCat" class="input" list="cats" value="${esc(p.category)}">
+    <datalist id="cats">${[...new Set(S.products.map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <label class="lbl">Video promocional (YouTube / Reels / TikTok / MP4)</label><input id="pVideo" type="url" class="input" placeholder="https://" value="${esc(p.video_url)}">
+    <label class="flex items-center gap-3 mt-4"><input id="pFeat" type="checkbox" class="w-6 h-6" ${p.is_featured ? 'checked' : ''}> Destacar en “Ofertas Especiales”</label>
+    <label class="flex items-center gap-3 mt-3"><input id="pAct" type="checkbox" class="w-6 h-6" ${p.is_active !== false ? 'checked' : ''}> Visible en la tienda</label>
+    <div class="flex gap-2 mt-5">
+      <button class="btn btn-brand flex-1" onclick="saveProduct('${id || ''}')">Guardar</button>
+      ${id ? `<button class="btn btn-soft" onclick="delProduct('${id}')">🗑️</button>` : ''}
+      <button class="btn btn-soft" onclick="closeModal()">Cerrar</button>
+    </div>`);
+}
+async function pickImg(inp) {
+  const f = inp.files[0]; if (!f) return;
+  $('#pStatus').textContent = 'Comprimiendo y subiendo…';
+  try { _img = await uploadImage(f); $('#pImg').src = _img; $('#pStatus').textContent = '✅ Imagen lista'; }
+  catch (e) { $('#pStatus').textContent = '❌ ' + e.message; }
+}
+async function saveProduct(id) {
+  const name = $('#pName').value.trim(); if (!name) return toast('Falta el título');
+  const old = S.products.find(x => x.id === id) || {};
+  const row = { ...old, name, description: $('#pDesc').value.trim(), price: +$('#pPrice').value || 0,
+    offer_price: $('#pOffer').value ? +$('#pOffer').value : null, category: $('#pCat').value.trim(), image_url: _img,
+    video_url: $('#pVideo').value.trim(), is_featured: $('#pFeat').checked, is_active: $('#pAct').checked };
+  try { await store.save('products', row); S.products = await store.list('products'); closeModal(); vProducts(); toast('Producto guardado'); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+async function delProduct(id) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  await store.remove('products', id); S.products = S.products.filter(p => p.id !== id); closeModal(); vProducts();
+}
+
+/* =============================== CLIENTES =============================== */
+function filteredCustomers() {
+  const q = S.custQuery.toLowerCase();
+  return S.customers.filter(c =>
+    (S.custFilter === 'all' || (S.custFilter === 'optin' && c.marketing_consent) || (S.custFilter === 'buyers' && S.orders.some(o => o.customer_id === c.id))) &&
+    (!q || [c.name, c.email, c.phone].some(v => (v || '').toLowerCase().includes(q))));
+}
+function vCustomers() {
+  view(`
+    <div class="flex items-center justify-between mb-3"><h2 class="font-bold text-lg">Clientes (${S.customers.length})</h2>
+      <button class="btn btn-brand" onclick="editCustomer()">＋ Nuevo</button></div>
+    <input id="cQ" class="input" placeholder="🔎 Buscar nombre, correo o teléfono" value="${esc(S.custQuery)}">
+    <div class="flex gap-2 my-3 text-sm">
+      ${[['all', 'Todos'], ['optin', 'Aceptan ofertas'], ['buyers', 'Compradores']].map(([k, l]) => `<button onclick="S.custFilter='${k}';S.custLimit=40;vCustomers()" class="px-3 py-2 rounded-full ${S.custFilter === k ? 'btn-brand text-white' : 'bg-white'}">${l}</button>`).join('')}
+    </div>
+    <div class="flex gap-2 mb-3">
+      <button class="btn btn-soft flex-1" onclick="exportCSV()">⬇️ Exportar CSV</button>
+      <label class="btn btn-soft flex-1 cursor-pointer">⬆️ Importar<input type="file" accept=".csv,text/csv" class="hidden" onchange="importCSV(this)"></label>
+    </div>
+    <div id="cList"></div>`);
+  $('#cQ').addEventListener('input', e => { S.custQuery = e.target.value; S.custLimit = 40; renderCustList(); });
+  renderCustList();
+}
+function renderCustList() {   // paginado: solo pinta 40 a la vez => fluido con miles de contactos
+  const all = filteredCustomers(), list = all.slice(0, S.custLimit);
+  $('#cList').innerHTML = list.map(c => {
+    const n = S.orders.filter(o => o.customer_id === c.id).length;
+    return `<div class="card p-3 mb-2 flex items-center gap-3" onclick="editCustomer('${c.id}')">
+      <div class="w-11 h-11 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-bold">${esc((c.name || '?')[0].toUpperCase())}</div>
+      <div class="flex-1 min-w-0"><div class="font-semibold truncate">${esc(c.name)}</div>
+        <div class="text-xs text-gray-500 truncate">${esc(c.phone || '')} ${c.email ? '· ' + esc(c.email) : ''}</div>
+        <div class="text-xs">${c.marketing_consent ? '✅ Acepta ofertas' : '⛔ Sin consentimiento'} · ${n} compra(s)</div></div>
+      ${c.phone ? `<a onclick="event.stopPropagation()" href="https://wa.me/${esc(c.phone)}" target="_blank" class="text-2xl">💬</a>` : ''}
+    </div>`;
+  }).join('') + (all.length > list.length ? `<button class="btn btn-soft w-full" onclick="S.custLimit+=40;renderCustList()">Ver más (${all.length - list.length})</button>` : '') || '<p class="text-sm text-gray-500">Sin resultados.</p>';
+}
+function editCustomer(id) {
+  const c = S.customers.find(x => x.id === id) || {};
+  const hist = S.orders.filter(o => o.customer_id === id);
+  openModal(`
+    <h3 class="font-bold text-lg mb-2">${id ? 'Editar' : 'Nuevo'} cliente</h3>
+    <label class="lbl">Nombre</label><input id="cName" class="input" value="${esc(c.name)}">
+    <label class="lbl">Teléfono / WhatsApp</label><input id="cPhone" type="tel" class="input" placeholder="0412 1234567" value="${esc(c.phone)}">
+    <label class="lbl">Correo</label><input id="cMail" type="email" class="input" value="${esc(c.email)}">
+    <label class="lbl">Notas</label><textarea id="cNotes" rows="2" class="input">${esc(c.notes)}</textarea>
+    <label class="flex items-center gap-3 mt-4"><input id="cOpt" type="checkbox" class="w-6 h-6" ${c.marketing_consent ? 'checked' : ''}> Aceptó recibir ofertas (WhatsApp / correo)</label>
+    ${hist.length ? `<h4 class="font-semibold mt-4">Historial de compras</h4>${hist.map(o => `<div class="text-sm flex justify-between border-b py-1"><span>${new Date(o.created_at).toLocaleDateString()} · ${esc(o.status)}</span><b>${money(o.total)}</b></div>`).join('')}` : ''}
+    <div class="flex gap-2 mt-5">
+      <button class="btn btn-brand flex-1" onclick="saveCustomer('${id || ''}')">Guardar</button>
+      ${id ? `<button class="btn btn-soft" onclick="delCustomer('${id}')">🗑️</button>` : ''}
+      <button class="btn btn-soft" onclick="closeModal()">Cerrar</button>
+    </div>`);
+}
+async function saveCustomer(id) {
+  const name = $('#cName').value.trim(); if (!name) return toast('Falta el nombre');
+  const old = S.customers.find(x => x.id === id) || {};
+  const opt = $('#cOpt').checked;
+  const row = { ...old, name, phone: normPhone($('#cPhone').value, S.settings.country_code) || null, email: $('#cMail').value.trim() || null,
+    notes: $('#cNotes').value.trim(), marketing_consent: opt, consent_at: opt ? (old.consent_at || new Date().toISOString()) : null, source: old.source || 'manual' };
+  try { await store.save('customers', row); S.customers = await store.list('customers', 20000); closeModal(); vCustomers(); toast('Cliente guardado'); }
+  catch (e) { toast('Error: ' + (e.message.includes('duplicate') ? 'Teléfono o correo ya existe' : e.message)); }
+}
+async function delCustomer(id) {
+  if (!confirm('¿Eliminar cliente?')) return;
+  await store.remove('customers', id); S.customers = S.customers.filter(c => c.id !== id); closeModal(); vCustomers();
+}
+
+/* CSV (compatible con Excel: UTF-8 con BOM) */
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  const sep = (text.split('\n')[0].match(/;/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur.replace(/\r$/, '')); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function exportCSV() {
+  const head = ['nombre', 'correo', 'telefono', 'acepta_ofertas', 'compras'];
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [head.join(',')].concat(S.customers.map(c => [c.name, c.email, c.phone, c.marketing_consent ? 'si' : 'no', S.orders.filter(o => o.customer_id === c.id).length].map(q).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'clientes.csv'; a.click();
+}
+async function importCSV(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const rows = parseCSV(await f.text()); if (rows.length < 2) return toast('Archivo vacío');
+  const h = rows[0].map(x => x.trim().toLowerCase());
+  const ix = k => h.findIndex(x => k.some(w => x.includes(w)));
+  const iN = ix(['nombre', 'name']), iE = ix(['correo', 'email', 'mail']), iP = ix(['tel', 'phone', 'whats']), iO = ix(['acepta', 'consent', 'optin']);
+  if (iN < 0) return toast('Falta la columna "nombre"');
+  const out = rows.slice(1).map(r => ({
+    name: (r[iN] || '').trim(), email: iE >= 0 ? (r[iE] || '').trim() || null : null,
+    phone: iP >= 0 ? normPhone(r[iP], S.settings.country_code) || null : null,
+    marketing_consent: iO >= 0 ? /^(si|sí|yes|1|true|x)$/i.test((r[iO] || '').trim()) : false, source: 'import'
+  })).filter(c => c.name && (c.phone || c.email));
+  try { await store.saveMany('customers', out); S.customers = await store.list('customers', 20000); vCustomers(); toast(`${out.length} contactos procesados`); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ========================= OFERTAS Y NOTIFICACIONES ===================== */
+let _sent = new Set();
+function vOffers() {
+  const def = '¡Hola {nombre}! 👋 Tenemos una oferta especial para ti en ' + (S.settings.business_name || 'nuestra tienda') + '. Míralo aquí: {link}';
+  view(`
+    <h2 class="font-bold text-lg mb-2">Enviar oferta</h2>
+    <label class="lbl">Producto u oferta (opcional)</label>
+    <select id="oProd" class="input"><option value="">— Solo la tienda —</option>${S.products.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+    <label class="lbl">Audiencia</label>
+    <select id="oAud" class="input"><option value="optin">Solo clientes que aceptaron ofertas ✅</option><option value="buyers">Compradores con consentimiento</option></select>
+    <label class="lbl">Mensaje (usa {nombre} y {link})</label>
+    <textarea id="oMsg" rows="5" class="input">${esc(def)}</textarea>
+    <button class="btn btn-brand w-full mt-3" onclick="buildSend()">Preparar envío</button>
+    <p class="text-xs text-gray-500 mt-2">Solo se incluyen clientes con consentimiento (opt-in). Envía de a poco desde WhatsApp para evitar bloqueos por spam.</p>
+    <div id="oList" class="mt-4"></div>`);
+}
+function offerLink() {
+  const id = $('#oProd').value, base = (CFG.STORE_URL || '').replace(/\/$/, '');
+  const p = S.products.find(x => x.id === id);
+  return !p ? base : (p.video_url && !base ? p.video_url : `${base}/?p=${p.id}`);
+}
+function buildSend() {
+  const aud = $('#oAud').value, msg = $('#oMsg').value, link = offerLink();
+  const list = S.customers.filter(c => c.marketing_consent && (aud === 'optin' || S.orders.some(o => o.customer_id === c.id)));
+  S._oList = list.map(c => ({ c, text: msg.replace(/\{nombre\}/g, (c.name || '').split(' ')[0]).replace(/\{link\}/g, link) }));
+  const mails = list.filter(c => c.email).map(c => c.email);
+  $('#oList').innerHTML = `
+    <div class="card p-3 mb-3 text-sm"><b>${list.length}</b> destinatarios · ${list.filter(c => c.phone).length} con WhatsApp · ${mails.length} con correo
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-soft flex-1" onclick="copyMails()">📋 Copiar correos (CCO)</button>
+        ${CFG.EMAIL_ENDPOINT ? `<button class="btn btn-brand flex-1" onclick="sendEmails()">✉️ Enviar correos</button>` : ''}
+      </div></div>
+    ${S._oList.slice(0, 100).map(({ c, text }) => `
+      <div class="card p-3 mb-2 flex items-center gap-2">
+        <div class="flex-1 min-w-0"><div class="font-semibold truncate">${esc(c.name)}</div><div class="text-xs text-gray-500">${esc(c.phone || c.email || '')}</div></div>
+        ${c.phone ? `<a id="w${c.id}" href="${waLink(c.phone, text)}" target="_blank" onclick="_sent.add('${c.id}');this.textContent='✔ Enviado'" class="btn btn-wa">${_sent.has(c.id) ? '✔ Enviado' : '💬 WhatsApp'}</a>` : ''}
+      </div>`).join('')}
+    ${list.length > 100 ? '<p class="text-xs text-gray-500">Mostrando los primeros 100. Usa la API de WhatsApp para envíos masivos.</p>' : ''}`;
+  store.save('campaigns', { channel: 'whatsapp', message: msg, audience: aud, sent_count: list.length, product_id: $('#oProd').value || null }).catch(() => {});
+}
+function copyMails() {
+  const m = S._oList.map(x => x.c.email).filter(Boolean).join(', ');
+  navigator.clipboard.writeText(m).then(() => toast('Correos copiados'), () => toast('No se pudo copiar'));
+}
+async function sendEmails() {   // Requiere una Edge Function propia que llame a Resend/SendGrid
+  const items = S._oList.filter(x => x.c.email).map(x => ({ to: x.c.email, name: x.c.name, text: x.text }));
+  try {
+    const r = await fetch(CFG.EMAIL_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: S.settings.business_name + ' · Oferta', items }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status); toast('Correos enviados');
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ============================== AJUSTES ================================= */
+function vSettings() {
+  const s = S.settings, f = (id, l, v, t = 'text') => `<label class="lbl">${l}</label><input id="${id}" type="${t}" class="input" value="${esc(v)}">`;
+  view(`
+    <h2 class="font-bold text-lg mb-2">Configuración del negocio</h2>
+    <div class="card p-4">
+      <div class="flex items-center gap-3">
+        <img id="sLogo" src="${esc(s.logo_url || '')}" class="w-20 h-20 rounded-2xl object-cover bg-gray-200" alt="">
+        <label class="btn btn-brand cursor-pointer">Subir logotipo<input type="file" accept="image/*" class="hidden" onchange="pickLogo(this)"></label>
+      </div>
+      ${f('sName', 'Nombre del negocio', s.business_name)}
+      <div class="grid grid-cols-2 gap-3 mt-1">
+        <div><label class="lbl">Color principal</label><input id="sC1" type="color" class="input p-1" value="${s.color_primary || '#0f766e'}"></div>
+        <div><label class="lbl">Color acento</label><input id="sC2" type="color" class="input p-1" value="${s.color_accent || '#f59e0b'}"></div>
+      </div>
+    </div>
+    <h3 class="font-bold mt-5 mb-2">Contacto</h3>
+    <div class="card p-4">
+      ${f('sWa', 'WhatsApp del negocio (con código de país)', s.whatsapp, 'tel')}
+      ${f('sCc', 'Código de país por defecto', s.country_code || '58', 'tel')}
+      ${f('sMail', 'Correo de contacto', s.contact_email, 'email')}
+      ${f('sAddr', 'Dirección (retiro en tienda)', s.address)}
+      ${s.whatsapp ? `<a class="text-sm underline" style="color:var(--brand)" target="_blank" href="https://wa.me/${esc(normPhone(s.whatsapp, s.country_code))}">Probar enlace directo</a>` : ''}
+    </div>
+    <h3 class="font-bold mt-5 mb-2">📱 Pago Móvil</h3>
+    <div class="card p-4">${f('sPmBank', 'Banco', s.pm_bank)}${f('sPmDoc', 'Cédula / RIF', s.pm_id_doc)}${f('sPmPhone', 'Teléfono', s.pm_phone, 'tel')}</div>
+    <h3 class="font-bold mt-5 mb-2">🏦 Transferencia bancaria</h3>
+    <div class="card p-4">${f('sTrBank', 'Banco', s.tr_bank)}${f('sTrAcc', 'Número de cuenta', s.tr_account)}${f('sTrHolder', 'Titular', s.tr_holder)}${f('sTrDoc', 'Cédula / RIF', s.tr_id_doc)}</div>
+    <h3 class="font-bold mt-5 mb-2">Entrega</h3>
+    <div class="card p-4 space-y-3">
+      <label class="flex items-center gap-3"><input id="sPick" type="checkbox" class="w-6 h-6" ${s.accepts_pickup !== false ? 'checked' : ''}> Retiro en tienda</label>
+      <label class="flex items-center gap-3"><input id="sDel" type="checkbox" class="w-6 h-6" ${s.accepts_delivery !== false ? 'checked' : ''}> Envío a domicilio / Delivery</label>
+    </div>
+    <button class="btn btn-brand w-full mt-5" onclick="saveSettings()">Guardar configuración</button>`);
+}
+let _logo = null;
+async function pickLogo(inp) {
+  const f = inp.files[0]; if (!f) return;
+  try { _logo = await uploadImage(f); $('#sLogo').src = _logo; toast('Logotipo listo, recuerda guardar'); } catch (e) { toast('Error: ' + e.message); }
+}
+async function saveSettings() {
+  const v = id => $('#' + id).value.trim();
+  const s = { ...S.settings, business_name: v('sName') || 'Mi Negocio', logo_url: _logo || S.settings.logo_url || null,
+    color_primary: $('#sC1').value, color_accent: $('#sC2').value, whatsapp: normPhone(v('sWa'), v('sCc')), country_code: v('sCc') || '58',
+    contact_email: v('sMail'), address: v('sAddr'), pm_bank: v('sPmBank'), pm_id_doc: v('sPmDoc'), pm_phone: v('sPmPhone'),
+    tr_bank: v('sTrBank'), tr_account: v('sTrAcc'), tr_holder: v('sTrHolder'), tr_id_doc: v('sTrDoc'),
+    accepts_pickup: $('#sPick').checked, accepts_delivery: $('#sDel').checked };
+  try { await store.saveSettings(s); S.settings = s; applyBrand(); toast('Configuración guardada'); } catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ============================ LOGIN + ARRANQUE ========================== */
+function loginScreen() {
+  $('nav').classList.add('hidden');
+  view(`<div class="card p-6 mt-10"><h2 class="font-bold text-xl mb-2">Ingresar</h2>
+    <label class="lbl">Correo</label><input id="lE" type="email" class="input">
+    <label class="lbl">Contraseña</label><input id="lP" type="password" class="input">
+    <button class="btn btn-brand w-full mt-4" onclick="doLogin()">Entrar</button></div>`);
+}
+async function doLogin() {
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lE').value, password: $('#lP').value });
+  if (error) return toast('Credenciales inválidas');
+  start();
+}
+$('#btnLogout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+async function start() {
+  try {
+    if (sb) {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) return loginScreen();
+      $('#btnLogout').classList.remove('hidden');
+    }
+    $('nav').classList.remove('hidden');
+    await loadAll(); go('home');
+  } catch (e) { view(`<div class="card p-4 text-red-700">Error al cargar: ${esc(e.message)}</div>`); }
+}
+start();
+</script>
+</body>
+</html>

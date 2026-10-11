@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel · Comercios Cagua</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https://*.supabase.co https://api.cloudinary.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="admin-icon-192.png">
+<link rel="apple-touch-icon" href="admin-icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="tailwind.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root { --brand:#0f766e; --accent:#f59e0b; --on-brand:#ffffff; --focus:#1d4ed8; }
+  body { -webkit-tap-highlight-color: transparent; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .btn { min-height:48px; border-radius:14px; font-weight:600; padding:0 18px; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-brand { background:var(--brand); color:var(--on-brand); }
+  .btn-soft { background:#e5e7eb; color:#111827; }
+  .btn-wa { background:#15803d; color:#fff; }
+  .input { width:100%; min-height:48px; border:1.5px solid #6b7280; border-radius:12px; padding:10px 14px; font-size:16px; background:#fff; color:#111827; }
+  .input[aria-invalid=true] { border-color:#b91c1c; border-width:2px; }
+  :focus-visible { outline:3px solid var(--focus); outline-offset:2px; box-shadow:0 0 0 5px #fff; }
+  label:focus-within { outline:3px solid var(--focus); outline-offset:2px; }
+  .card { background:#fff; border-radius:18px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .tab-on { color:var(--brand); font-weight:700; }
+  .sheet { animation: up .22s ease-out; } @keyframes up { from { transform:translateY(40px); opacity:0 } to { transform:none; opacity:1 } }
+  label.lbl { display:block; font-size:14px; font-weight:600; color:#374151; margin:12px 0 4px; }
+  .skip { position:absolute; left:-999px; top:0; background:#fff; color:#000; padding:12px 16px; z-index:100; border-radius:0 0 12px 0; font-weight:600; }
+  .skip:focus { left:0; }
+  .link { color:#0f5f58; text-decoration:underline; text-underline-offset:2px; }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+<a class="skip" href="#view">Saltar al contenido</a>
+
+<header id="topbar" class="sticky top-0 z-30 bg-[var(--brand)] px-4 pt-3 pb-3 flex items-center gap-3 shadow" style="color:var(--on-brand)">
+  <img id="hLogo" class="w-10 h-10 rounded-full bg-white object-cover hidden" alt="">
+  <div class="flex-1 min-w-0">
+    <h1 id="hName" class="font-bold truncate">Panel · Comercios Cagua</h1>
+    <div id="hMode" class="text-xs"></div>
+  </div>
+  <button id="btnLogout" class="text-sm underline min-h-[44px] px-2 hidden">Salir</button>
+</header>
+
+<main id="view" tabindex="-1" class="p-4 max-w-2xl mx-auto focus:outline-none"></main>
+
+<nav aria-label="Navegación principal" class="fixed bottom-0 inset-x-0 z-30 bg-white border-t flex justify-around" style="padding-bottom:env(safe-area-inset-bottom)">
+  <button data-tab="home" class="flex-1 py-2 min-h-[56px] flex flex-col items-center text-xs text-gray-700"><span class="text-2xl" aria-hidden="true">🏠</span>Inicio</button>
+  <button data-tab="products" class="flex-1 py-2 min-h-[56px] flex flex-col items-center text-xs text-gray-700"><span class="text-2xl" aria-hidden="true">🛍️</span>Productos</button>
+  <button data-tab="customers" class="flex-1 py-2 min-h-[56px] flex flex-col items-center text-xs text-gray-700"><span class="text-2xl" aria-hidden="true">👥</span>Clientes</button>
+  <button data-tab="offers" class="flex-1 py-2 min-h-[56px] flex flex-col items-center text-xs text-gray-700"><span class="text-2xl" aria-hidden="true">📣</span>Ofertas</button>
+  <button data-tab="settings" class="flex-1 py-2 min-h-[56px] flex flex-col items-center text-xs text-gray-700"><span class="text-2xl" aria-hidden="true">⚙️</span>Ajustes</button>
+</nav>
+
+<div id="modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-end sm:items-center justify-center">
+  <div id="modalBody" tabindex="-1" class="sheet bg-gray-50 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-5 focus:outline-none"></div>
+</div>
+<div id="toast" aria-hidden="true" class="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-full hidden max-w-[90vw] text-center"></div>
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================== UTILIDADES ============================== */
+const CFG = window.APP_CONFIG || {};
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '$' + Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3200);
+  const l = $('#live'); l.textContent = ''; setTimeout(() => { l.textContent = msg; }, 30);
+}
+function safeUrl(u) {
+  u = String(u || '').trim(); if (!u) return '';
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
+  try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; }
+}
+function lum(hex) {
+  const h = String(hex || '#000').replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  const f = c => (c /= 255) <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4);
+  return .2126 * f(n >> 16 & 255) + .7152 * f(n >> 8 & 255) + .0722 * f(n & 255);
+}
+const onColor = hex => lum(hex) > .179 ? '#111827' : '#ffffff';
+
+/* Etiquetas asociadas a sus campos (lectores de pantalla) */
+function a11y(root = document) {
+  root.querySelectorAll('label.lbl').forEach(l => {
+    if (l.htmlFor) return; const n = l.nextElementSibling;
+    if (n && n.id && /^(INPUT|SELECT|TEXTAREA)$/.test(n.tagName)) l.htmlFor = n.id;
+  });
+}
+/* Ventanas (modal) accesibles */
+let _lastFocus = null;
+const BG = () => ['#topbar', '#view', 'nav'].map(s => $(s)).filter(Boolean);
+function openModal(html) {
+  const m = $('#modal'), b = $('#modalBody'), was = !m.classList.contains('hidden'), st = b.scrollTop;
+  if (!was) _lastFocus = document.activeElement;
+  b.innerHTML = html; m.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  b.setAttribute('role', 'dialog'); b.setAttribute('aria-modal', 'true');
+  const h = b.querySelector('h2,h3'); if (h) { h.id = 'dlgTitle'; b.setAttribute('aria-labelledby', 'dlgTitle'); }
+  BG().forEach(e => { e.inert = true; }); a11y(b); b.scrollTop = was ? st : 0; if (!was) b.focus({ preventScroll: true });
+}
+function closeModal() {
+  $('#modal').classList.add('hidden'); document.body.style.overflow = ''; $('#modalBody').innerHTML = '';
+  BG().forEach(e => { e.inert = false; });
+  if (_lastFocus && document.contains(_lastFocus)) _lastFocus.focus({ preventScroll: true }); _lastFocus = null;
+}
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => {
+  const open = !$('#modal').classList.contains('hidden');
+  if (open && e.key === 'Escape') { closeModal(); return; }
+  if (open && e.key === 'Tab') {
+    const f = [...$('#modalBody').querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent !== null || x.classList.contains('sr-only'));
+    if (!f.length) return; const a = f[0], z = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === a || document.activeElement === $('#modalBody'))) { e.preventDefault(); z.focus(); }
+    else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+  }
+  const t = e.target.closest && e.target.closest('[role=button]');
+  if (t && e.target === t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); }
+});
+document.addEventListener('input', e => { if (e.target.removeAttribute) e.target.removeAttribute('aria-invalid'); });
+
+function normPhone(p, cc) {
+  let d = String(p || '').replace(/\D/g, '');
+  if (!d) return '';
+  cc = cc || '58';
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.startsWith('0')) d = cc + d.slice(1);       // 0412... -> 58412...
+  else if (d.length <= 10 && !d.startsWith(cc)) d = cc + d;
+  return d;
+}
+
+/* ============================ CAPA DE DATOS ============================= */
+// Con credenciales usa Supabase; sin ellas funciona en modo demo (localStorage).
+const sb = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase)
+  ? supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+
+/* Si falta ejecutar schema_legal.sql, las columnas nuevas no existen: se guardan sin ellas y se avisa. */
+const missingCol = err => { const m = /Could not find the '([^']+)' column/.exec((err && err.message) || ''); return m ? m[1] : null; };
+async function sbWrite(run, rows) {
+  const arr = Array.isArray(rows) ? rows : [rows];
+  for (let i = 0; i < 10; i++) {
+    const r = await run(Array.isArray(rows) ? arr : arr[0]);
+    if (!r.error) return r;
+    const c = missingCol(r.error); if (!c || !arr.some(x => c in x)) throw r.error;
+    arr.forEach(x => { delete x[c]; }); S.needsSql = true;
+  }
+  throw new Error('No se pudo guardar');
+}
+
+const store = {
+  async list(t, limit = 5000) {
+    if (sb) { const { data, error } = await sb.from(t).select('*').order('created_at', { ascending: false }).limit(limit); if (error) throw error; return data; }
+    return JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+  },
+  async save(t, row) {
+    row = { ...row };
+    if (sb) {
+      if (!row.id) delete row.id;
+      const r = await sbWrite(x => sb.from(t).upsert(x).select().single(), row); return r.data;
+    }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+    if (!row.id) { row.id = uid(); row.created_at = new Date().toISOString(); all.unshift(row); }
+    else { const i = all.findIndex(x => x.id === row.id); if (i >= 0) all[i] = { ...all[i], ...row }; else all.unshift(row); }
+    localStorage.setItem('mk_' + t, JSON.stringify(all)); return row;
+  },
+  async saveMany(t, rows) {
+    if (sb) {
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500).map(x => ({ ...x }));
+        await sbWrite(x => sb.from(t).upsert(x, { onConflict: 'phone', ignoreDuplicates: true }), batch);
+      }
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]');
+    const seen = new Set(all.map(x => x.phone || x.email));
+    rows.forEach(r => { const k = r.phone || r.email; if (k && seen.has(k)) return; seen.add(k); all.unshift({ ...r, id: uid(), created_at: new Date().toISOString() }); });
+    localStorage.setItem('mk_' + t, JSON.stringify(all));
+  },
+  async remove(t, id) {
+    if (sb) { const { error } = await sb.from(t).delete().eq('id', id); if (error) throw error; return; }
+    const all = JSON.parse(localStorage.getItem('mk_' + t) || '[]').filter(x => x.id !== id);
+    localStorage.setItem('mk_' + t, JSON.stringify(all));
+  },
+  async getSettings() {
+    if (sb) { const { data } = await sb.from('business_settings').select('*').eq('id', 'main').maybeSingle(); return data || {}; }
+    return JSON.parse(localStorage.getItem('mk_settings') || '{}');
+  },
+  async saveSettings(s) {
+    s = { ...s, id: 'main', updated_at: new Date().toISOString() };
+    if (sb) { await sbWrite(x => sb.from('business_settings').upsert(x), s); return; }
+    localStorage.setItem('mk_settings', JSON.stringify(s));
+  }
+};
+
+/* ===================== SUBIDA DE IMÁGENES + COMPRESIÓN ================== */
+// Comprime en el teléfono (máx 1280px, JPEG 80%) antes de subir => cargas ultrarrápidas.
+function compressImage(file, maxSize = 1280, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const r = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => { URL.revokeObjectURL(url); b ? resolve(b) : reject(new Error('No se pudo comprimir')); }, 'image/jpeg', quality);
+    };
+    img.onerror = () => reject(new Error('Imagen inválida'));
+    img.src = url;
+  });
+}
+const blobToDataURL = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+
+async function uploadImage(file) {
+  const blob = await compressImage(file);
+  if (CFG.CLOUDINARY_CLOUD_NAME && CFG.CLOUDINARY_UPLOAD_PRESET) {
+    const fd = new FormData(); fd.append('file', blob); fd.append('upload_preset', CFG.CLOUDINARY_UPLOAD_PRESET);
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${CFG.CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+    const j = await r.json(); if (!j.secure_url) throw new Error('Falló la subida a Cloudinary');
+    return j.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');   // entrega optimizada
+  }
+  if (sb) {
+    const path = `products/${uid()}.jpg`;
+    const { error } = await sb.storage.from('media').upload(path, blob, { contentType: 'image/jpeg' });
+    if (error) throw error;
+    return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  }
+  return await blobToDataURL(blob);   // modo demo
+}
+
+/* ============================== ESTADO ================================== */
+const S = { tab: 'home', settings: {}, products: [], customers: [], orders: [], custLimit: 40, custQuery: '', custFilter: 'all', needsSql: false };
+
+function applyBrand() {
+  const s = S.settings, root = document.documentElement.style;
+  root.setProperty('--brand', s.color_primary || '#0f766e'); root.setProperty('--accent', s.color_accent || '#f59e0b');
+  root.setProperty('--on-brand', onColor(s.color_primary || '#0f766e'));
+  document.querySelector('meta[name=theme-color]').content = s.color_primary || '#0f766e';
+  const nm = s.business_name && s.business_name !== 'Mi Negocio' ? s.business_name : 'Comercios Cagua';
+  $('#hName').textContent = 'Panel · ' + nm;
+  const l = $('#hLogo'); if (s.logo_url) { l.src = s.logo_url; l.classList.remove('hidden'); } else l.classList.add('hidden');
+  $('#hMode').textContent = sb ? 'Conectado a Supabase' : 'Modo demo (datos locales)';
+}
+
+async function loadAll() {
+  [S.settings, S.products, S.customers, S.orders] = await Promise.all([store.getSettings(), store.list('products'), store.list('customers', 20000), store.list('orders', 2000)]);
+  if (sb && !('legal_name' in S.settings)) S.needsSql = true;
+  applyBrand();
+}
+
+function go(tab) {
+  S.tab = tab;
+  document.querySelectorAll('nav button').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('tab-on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  ({ home: vHome, products: vProducts, customers: vCustomers, offers: vOffers, settings: vSettings })[tab]();
+  a11y($('#view')); window.scrollTo(0, 0); $('#view').focus({ preventScroll: true });
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => go(b.dataset.tab)));
+
+const view = html => { $('#view').innerHTML = html; };
+const waLink = (phone, text) => `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+
+/* =============================== INICIO ================================= */
+function vHome() {
+  const optin = S.customers.filter(c => c.marketing_consent).length;
+  const pend = S.orders.filter(o => o.status === 'pendiente');
+  const ventas = S.orders.filter(o => o.status !== 'cancelado').reduce((a, o) => a + Number(o.total || 0), 0);
+  const stat = (n, l, ic) => `<div class="card p-4"><div class="text-2xl" aria-hidden="true">${ic}</div><div class="text-2xl font-bold">${n}</div><div class="text-xs text-gray-700">${l}</div></div>`;
+  const s = S.settings, falta = !s.rif || !(s.contact_email || s.whatsapp) || !s.address;
+  view(`
+    ${S.needsSql ? `<div class="card p-4 mb-3 border-2 border-amber-500" role="alert"><b>⚠️ Falta actualizar la base de datos</b><p class="text-sm mt-1">Ejecuta <code>schema_legal.sql</code> en Supabase (SQL Editor) para registrar el consentimiento de los clientes y la aceptación de términos en cada pedido.</p></div>` : ''}
+    ${falta ? `<div class="card p-4 mb-3 border-2 border-amber-500"><b>📋 Completa tus datos legales</b><p class="text-sm mt-1">Faltan datos del negocio (RIF, dirección o un medio de contacto) que aparecen en las páginas legales de la tienda.</p><button class="btn btn-soft mt-2 w-full" onclick="go('settings')">Ir a Ajustes</button></div>` : ''}
+    <div class="grid grid-cols-2 gap-3">
+      ${stat(S.products.length, 'Productos', '🛍️')}${stat(S.customers.length, 'Clientes', '👥')}
+      ${stat(optin, 'Aceptan ofertas', '✅')}${stat(money(ventas), 'Ventas', '💰')}
+    </div>
+    <h2 class="font-bold mt-6 mb-2">Pedidos pendientes (${pend.length})</h2>
+    <div class="space-y-3">${pend.slice(0, 15).map(o => `
+      <div class="card p-4">
+        <div class="flex justify-between"><b>${esc(o.customer_name)}</b><b>${money(o.total)}</b></div>
+        <div class="text-xs text-gray-700 mt-1">${o.delivery_type === 'delivery' ? '🚚 Delivery' : '🏪 Retiro'} · ${esc(o.payment_method || '')} ${o.payment_ref ? '· Ref ' + esc(o.payment_ref) : ''}</div>
+        ${o.terms_version ? `<div class="text-xs text-gray-700">Términos aceptados (v${esc(o.terms_version)})</div>` : ''}
+        ${o.payment_proof_url ? `<a class="text-xs link inline-block py-2" href="${esc(o.payment_proof_url)}" target="_blank" rel="noopener">Ver comprobante (se abre en otra pestaña)</a>` : ''}
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-brand flex-1" onclick="setOrder('${o.id}','pagado')">Confirmar pago</button>
+          <button class="btn btn-soft" onclick="setOrder('${o.id}','cancelado')" aria-label="Cancelar pedido de ${esc(o.customer_name)}">✕</button>
+        </div>
+      </div>`).join('') || '<p class="text-sm text-gray-700">Sin pedidos pendientes.</p>'}</div>
+    ${!S.products.length && !sb ? `<button class="btn btn-soft w-full mt-6" onclick="seedDemo()">Cargar datos de ejemplo</button>` : ''}
+  `);
+}
+async function setOrder(id, status) {
+  const o = S.orders.find(x => x.id === id); o.status = status; await store.save('orders', o); toast('Pedido ' + status); vHome(); a11y($('#view'));
+}
+async function seedDemo() {
+  await store.save('products', { name: 'Zapatillas Urban', description: 'Cómodas y ligeras', price: 35, category: 'Calzado', is_active: true, is_featured: true });
+  await store.saveMany('customers', [
+    { name: 'María Pérez', phone: '584121112233', email: 'maria@mail.com', marketing_consent: true, source: 'manual' },
+    { name: 'José Rojas', phone: '584143334455', email: '', marketing_consent: true, source: 'manual' }]);
+  await loadAll(); go('home'); toast('Datos de ejemplo cargados');
+}
+
+/* ============================== PRODUCTOS =============================== */
+function vProducts() {
+  view(`
+    <div class="flex items-center justify-between mb-3"><h2 class="font-bold text-lg">Catálogo</h2>
+      <button class="btn btn-brand" onclick="editProduct()">＋ Nuevo</button></div>
+    <div class="space-y-3">${S.products.map(p => `
+      <div class="card p-3 flex gap-3 items-center cursor-pointer" role="button" tabindex="0" onclick="editProduct('${p.id}')" aria-label="Editar producto ${esc(p.name)}">
+        <img src="${esc(p.image_url || '')}" onerror="this.style.visibility='hidden'" loading="lazy" class="w-20 h-20 rounded-xl object-cover bg-gray-200" alt="">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold truncate">${esc(p.name)}</div>
+          <div class="text-sm text-gray-700 truncate">${esc(p.category || 'Sin categoría')}</div>
+          <div class="font-bold" style="color:var(--brand)">${money(p.offer_price || p.price)} ${p.offer_price ? `<s class="text-xs text-gray-600">${money(p.price)}</s>` : ''}</div>
+          <div class="text-xs">${p.is_featured ? '🔥 Oferta ' : ''}${p.video_url ? '🎬 Video ' : ''}${p.is_active === false ? '🚫 Oculto' : ''}</div>
+        </div>
+      </div>`).join('') || '<p class="text-sm text-gray-700">Aún no hay productos. Toca “Nuevo”.</p>'}</div>`);
+}
+let _img = '';
+function editProduct(id) {
+  const p = S.products.find(x => x.id === id) || { is_active: true };
+  _img = p.image_url || '';
+  openModal(`
+    <h2 class="font-bold text-lg mb-2">${id ? 'Editar' : 'Nuevo'} producto</h2>
+    <div class="flex items-center gap-3">
+      <img id="pImg" src="${esc(_img)}" class="w-24 h-24 rounded-2xl object-cover bg-gray-200" alt="Foto del producto">
+      <div class="flex-1 space-y-2">
+        <label class="btn btn-brand w-full cursor-pointer"><span aria-hidden="true">📷</span> Tomar foto<input type="file" accept="image/*" capture="environment" class="sr-only" onchange="pickImg(this)"></label>
+        <label class="btn btn-soft w-full cursor-pointer"><span aria-hidden="true">🖼️</span> Galería<input type="file" accept="image/*" class="sr-only" onchange="pickImg(this)"></label>
+      </div>
+    </div>
+    <div id="pStatus" class="text-xs text-gray-700 mt-1" role="status"></div>
+    <label class="lbl">Título</label><input id="pName" class="input" value="${esc(p.name)}">
+    <label class="lbl">Descripción</label><textarea id="pDesc" rows="3" class="input">${esc(p.description)}</textarea>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="lbl">Precio (USD)</label><input id="pPrice" type="number" inputmode="decimal" step="0.01" class="input" value="${p.price ?? ''}"></div>
+      <div><label class="lbl">Precio oferta</label><input id="pOffer" type="number" inputmode="decimal" step="0.01" class="input" value="${p.offer_price ?? ''}"></div>
+    </div>
+    <label class="lbl">Categoría</label><input id="pCat" class="input" list="cats" value="${esc(p.category)}">
+    <datalist id="cats">${[...new Set(S.products.map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <label class="lbl">Video promocional (YouTube / Reels / TikTok / MP4)</label><input id="pVideo" type="text" inputmode="url" class="input" placeholder="https://" value="${esc(p.video_url)}">
+    <label class="flex items-center gap-3 mt-4"><input id="pFeat" type="checkbox" class="w-6 h-6" ${p.is_featured ? 'checked' : ''}> Destacar en “Ofertas Especiales”</label>
+    <label class="flex items-center gap-3 mt-3"><input id="pAct" type="checkbox" class="w-6 h-6" ${p.is_active !== false ? 'checked' : ''}> Visible en la tienda</label>
+    <div class="flex gap-2 mt-5">
+      <button class="btn btn-brand flex-1" onclick="saveProduct('${id || ''}')">Guardar</button>
+      ${id ? `<button class="btn btn-soft" onclick="delProduct('${id}')" aria-label="Eliminar producto">🗑️</button>` : ''}
+      <button class="btn btn-soft" onclick="closeModal()">Cerrar</button>
+    </div>`);
+}
+async function pickImg(inp) {
+  const f = inp.files[0]; if (!f) return;
+  $('#pStatus').textContent = 'Comprimiendo y subiendo…';
+  try { _img = await uploadImage(f); $('#pImg').src = _img; $('#pStatus').textContent = '✅ Imagen lista'; }
+  catch (e) { $('#pStatus').textContent = '❌ ' + e.message; }
+}
+async function saveProduct(id) {
+  const name = $('#pName').value.trim(); if (!name) { $('#pName').setAttribute('aria-invalid', 'true'); $('#pName').focus(); return toast('Falta el título'); }
+  const rawV = $('#pVideo').value.trim(), video = safeUrl(rawV);
+  if (rawV && !video) { $('#pVideo').setAttribute('aria-invalid', 'true'); $('#pVideo').focus(); return toast('El enlace del video no es válido'); }
+  const old = S.products.find(x => x.id === id) || {};
+  const row = { ...old, name, description: $('#pDesc').value.trim(), price: +$('#pPrice').value || 0,
+    offer_price: $('#pOffer').value ? +$('#pOffer').value : null, category: $('#pCat').value.trim(), image_url: _img,
+    video_url: video, is_featured: $('#pFeat').checked, is_active: $('#pAct').checked };
+  try { await store.save('products', row); S.products = await store.list('products'); closeModal(); vProducts(); a11y($('#view')); toast('Producto guardado'); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+async function delProduct(id) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  await store.remove('products', id); S.products = S.products.filter(p => p.id !== id); closeModal(); vProducts(); a11y($('#view'));
+}
+
+/* =============================== CLIENTES =============================== */
+function filteredCustomers() {
+  const q = S.custQuery.toLowerCase();
+  return S.customers.filter(c =>
+    (S.custFilter === 'all' || (S.custFilter === 'optin' && c.marketing_consent) || (S.custFilter === 'buyers' && S.orders.some(o => o.customer_id === c.id))) &&
+    (!q || [c.name, c.email, c.phone].some(v => (v || '').toLowerCase().includes(q))));
+}
+function vCustomers() {
+  view(`
+    <div class="flex items-center justify-between mb-3"><h2 class="font-bold text-lg">Clientes (${S.customers.length})</h2>
+      <button class="btn btn-brand" onclick="editCustomer()">＋ Nuevo</button></div>
+    <input id="cQ" type="search" class="input" aria-label="Buscar por nombre, correo o teléfono" placeholder="🔎 Buscar nombre, correo o teléfono" value="${esc(S.custQuery)}">
+    <div class="flex flex-wrap gap-2 my-3 text-sm" role="group" aria-label="Filtrar clientes">
+      ${[['all', 'Todos'], ['optin', 'Aceptan ofertas'], ['buyers', 'Compradores']].map(([k, l]) => `<button aria-pressed="${S.custFilter === k}" onclick="S.custFilter='${k}';S.custLimit=40;vCustomers();a11y($('#view'))" class="px-4 min-h-[44px] rounded-full border ${S.custFilter === k ? 'btn-brand border-transparent' : 'bg-white border-gray-400'}">${l}</button>`).join('')}
+    </div>
+    <div class="flex gap-2 mb-3">
+      <button class="btn btn-soft flex-1" onclick="exportCSV()"><span aria-hidden="true">⬇️</span> Exportar CSV</button>
+      <label class="btn btn-soft flex-1 cursor-pointer"><span aria-hidden="true">⬆️</span> Importar<input type="file" accept=".csv,text/csv" class="sr-only" onchange="importCSV(this)"></label>
+    </div>
+    <div id="cList"></div>`);
+  $('#cQ').addEventListener('input', e => { S.custQuery = e.target.value; S.custLimit = 40; renderCustList(); });
+  renderCustList();
+}
+function renderCustList() {   // paginado: solo pinta 40 a la vez => fluido con miles de contactos
+  const all = filteredCustomers(), list = all.slice(0, S.custLimit);
+  $('#cList').innerHTML = list.map(c => {
+    const n = S.orders.filter(o => o.customer_id === c.id).length;
+    return `<div class="card mb-2 flex items-center">
+      <div class="flex-1 min-w-0 p-3 flex items-center gap-3 cursor-pointer" role="button" tabindex="0" onclick="editCustomer('${c.id}')" aria-label="Editar cliente ${esc(c.name)}">
+        <div class="w-11 h-11 shrink-0 rounded-full bg-[var(--brand)] flex items-center justify-center font-bold" style="color:var(--on-brand)" aria-hidden="true">${esc((c.name || '?')[0].toUpperCase())}</div>
+        <div class="min-w-0"><div class="font-semibold truncate">${esc(c.name)}</div>
+          <div class="text-xs text-gray-700 truncate">${esc(c.phone || '')} ${c.email ? '· ' + esc(c.email) : ''}</div>
+          <div class="text-xs">${c.marketing_consent ? '✅ Acepta ofertas' : '⛔ Sin consentimiento'} · ${n} compra(s)</div></div></div>
+      ${c.phone ? `<a href="https://wa.me/${esc(c.phone)}" target="_blank" rel="noopener" class="w-12 h-12 mr-1 flex items-center justify-center text-2xl" aria-label="Escribir por WhatsApp a ${esc(c.name)} (se abre en otra pestaña)"><span aria-hidden="true">💬</span></a>` : ''}
+    </div>`;
+  }).join('') + (all.length > list.length ? `<button class="btn btn-soft w-full" onclick="S.custLimit+=40;renderCustList()">Ver más (${all.length - list.length})</button>` : '') || '<p class="text-sm text-gray-700">Sin resultados.</p>';
+}
+const SRC_LABEL = { 'manual-verbal': 'Verbalmente / en persona', 'manual-whatsapp': 'Por mensaje de WhatsApp del cliente', 'manual-escrito': 'Por formulario o documento escrito', tienda: 'En la tienda en línea', import: 'Importado por el administrador' };
+function editCustomer(id) {
+  const c = S.customers.find(x => x.id === id) || {};
+  const hist = S.orders.filter(o => o.customer_id === id);
+  const fixed = c.consent_source === 'tienda' || c.consent_source === 'import';
+  openModal(`
+    <h2 class="font-bold text-lg mb-2">${id ? 'Editar' : 'Nuevo'} cliente</h2>
+    <label class="lbl">Nombre</label><input id="cName" class="input" autocomplete="off" value="${esc(c.name)}">
+    <label class="lbl">Teléfono / WhatsApp</label><input id="cPhone" type="tel" class="input" placeholder="0412 1234567" value="${esc(c.phone)}">
+    <label class="lbl">Correo</label><input id="cMail" type="email" class="input" value="${esc(c.email)}">
+    <label class="lbl">Notas</label><textarea id="cNotes" rows="2" class="input">${esc(c.notes)}</textarea>
+    <label class="flex items-center gap-3 mt-4"><input id="cOpt" type="checkbox" class="w-6 h-6" ${c.marketing_consent ? 'checked' : ''}> Aceptó recibir ofertas (WhatsApp / correo)</label>
+    ${fixed ? `<p class="text-xs text-gray-700 mt-1">Consentimiento: ${esc(SRC_LABEL[c.consent_source])}${c.consent_at ? ' · ' + new Date(c.consent_at).toLocaleDateString() : ''}.</p>`
+      : `<label class="lbl">¿Cómo dio su consentimiento?</label><select id="cSrc" class="input">${['manual-verbal', 'manual-whatsapp', 'manual-escrito'].map(k => `<option value="${k}" ${c.consent_source === k ? 'selected' : ''}>${SRC_LABEL[k]}</option>`).join('')}</select>
+      <p class="text-xs text-gray-700 mt-1">Marca la casilla solo si el cliente aceptó claramente. Si pide darse de baja, desmárcala.</p>`}
+    ${hist.length ? `<h3 class="font-semibold mt-4">Historial de compras</h3>${hist.map(o => `<div class="text-sm flex justify-between border-b py-1"><span>${new Date(o.created_at).toLocaleDateString()} · ${esc(o.status)}</span><b>${money(o.total)}</b></div>`).join('')}` : ''}
+    <div class="flex gap-2 mt-5">
+      <button class="btn btn-brand flex-1" onclick="saveCustomer('${id || ''}')">Guardar</button>
+      ${id ? `<button class="btn btn-soft" onclick="delCustomer('${id}')" aria-label="Eliminar cliente">🗑️</button>` : ''}
+      <button class="btn btn-soft" onclick="closeModal()">Cerrar</button>
+    </div>`);
+}
+async function saveCustomer(id) {
+  const name = $('#cName').value.trim(); if (!name) { $('#cName').setAttribute('aria-invalid', 'true'); $('#cName').focus(); return toast('Falta el nombre'); }
+  const old = S.customers.find(x => x.id === id) || {};
+  const opt = $('#cOpt').checked, src = $('#cSrc') ? $('#cSrc').value : old.consent_source;
+  const row = { ...old, name, phone: normPhone($('#cPhone').value, S.settings.country_code) || null, email: $('#cMail').value.trim() || null,
+    notes: $('#cNotes').value.trim(), marketing_consent: opt, consent_at: opt ? (old.consent_at || new Date().toISOString()) : null, source: old.source || 'manual' };
+  if (opt) { row.consent_source = src || 'manual-verbal'; row.consent_text = old.consent_text || `Consentimiento registrado por el administrador (${SRC_LABEL[row.consent_source] || row.consent_source})`; }
+  try { await store.save('customers', row); S.customers = await store.list('customers', 20000); closeModal(); vCustomers(); a11y($('#view')); toast('Cliente guardado'); }
+  catch (e) { toast('Error: ' + (e.message.includes('duplicate') ? 'Teléfono o correo ya existe' : e.message)); }
+}
+async function delCustomer(id) {
+  if (!confirm('¿Eliminar cliente? Sus pedidos se conservan sin vincularse a su ficha. Esta acción no se puede deshacer.')) return;
+  await store.remove('customers', id); S.customers = S.customers.filter(c => c.id !== id); closeModal(); vCustomers(); a11y($('#view'));
+}
+
+/* CSV (compatible con Excel: UTF-8 con BOM) */
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  const sep = (text.split('\n')[0].match(/;/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur.replace(/\r$/, '')); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function exportCSV() {
+  if (!confirm('El archivo contendrá datos personales de tus clientes. Guárdalo en un lugar seguro y no lo compartas. ¿Continuar?')) return;
+  const head = ['nombre', 'correo', 'telefono', 'acepta_ofertas', 'compras'];
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [head.join(',')].concat(S.customers.map(c => [c.name, c.email, c.phone, c.marketing_consent ? 'si' : 'no', S.orders.filter(o => o.customer_id === c.id).length].map(q).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'clientes.csv'; a.click();
+}
+async function importCSV(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const rows = parseCSV(await f.text()); if (rows.length < 2) { inp.value = ''; return toast('Archivo vacío'); }
+  const h = rows[0].map(x => x.trim().toLowerCase());
+  const ix = k => h.findIndex(x => k.some(w => x.includes(w)));
+  const iN = ix(['nombre', 'name']), iE = ix(['correo', 'email', 'mail']), iP = ix(['tel', 'phone', 'whats']), iO = ix(['acepta', 'consent', 'optin']);
+  if (iN < 0) { inp.value = ''; return toast('Falta la columna "nombre"'); }
+  const now = new Date().toISOString();
+  const out = rows.slice(1).map(r => {
+    const opt = iO >= 0 ? /^(si|sí|yes|1|true|x)$/i.test((r[iO] || '').trim()) : false;
+    return { name: (r[iN] || '').trim(), email: iE >= 0 ? (r[iE] || '').trim() || null : null,
+      phone: iP >= 0 ? normPhone(r[iP], S.settings.country_code) || null : null,
+      marketing_consent: opt, consent_at: opt ? now : null, consent_source: opt ? 'import' : null,
+      consent_text: opt ? 'Importado por el administrador, que declaró contar con el consentimiento del cliente' : null, source: 'import' };
+  }).filter(c => c.name && (c.phone || c.email));
+  const withOpt = out.filter(c => c.marketing_consent).length;
+  if (withOpt && !confirm(`${withOpt} contactos están marcados como “aceptan ofertas”.\n\nAl importar declaras que tienes su consentimiento para escribirles con ofertas (y que puedes demostrarlo). Si no es así, cancela y vuelve a importar con la columna acepta_ofertas en “no”.\n\n¿Confirmas?`)) { inp.value = ''; return; }
+  try { await store.saveMany('customers', out); S.customers = await store.list('customers', 20000); vCustomers(); a11y($('#view')); toast(`${out.length} contactos procesados`); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ========================= OFERTAS Y NOTIFICACIONES ===================== */
+let _sent = new Set();
+function vOffers() {
+  const def = '¡Hola {nombre}! 👋 Tenemos una oferta especial para ti en ' + (S.settings.business_name && S.settings.business_name !== 'Mi Negocio' ? S.settings.business_name : 'Comercios Cagua') + '. Míralo aquí: {link}\n\nSi ya no quieres recibir ofertas, responde BAJA.';
+  view(`
+    <h2 class="font-bold text-lg mb-2">Enviar oferta</h2>
+    <label class="lbl">Producto u oferta (opcional)</label>
+    <select id="oProd" class="input"><option value="">— Solo la tienda —</option>${S.products.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+    <label class="lbl">Audiencia</label>
+    <select id="oAud" class="input"><option value="optin">Solo clientes que aceptaron ofertas ✅</option><option value="buyers">Compradores con consentimiento</option></select>
+    <label class="lbl">Mensaje (usa {nombre} y {link})</label>
+    <textarea id="oMsg" rows="6" class="input">${esc(def)}</textarea>
+    <button class="btn btn-brand w-full mt-3" onclick="buildSend()">Preparar envío</button>
+    <div class="card p-3 mt-3 text-xs text-gray-800">
+      <b>Reglas para enviar ofertas</b>
+      <ul class="list-disc pl-5 mt-1 space-y-1">
+        <li>Solo se incluyen clientes que dieron su consentimiento.</li>
+        <li>Mantén en el mensaje cómo darse de baja (“responde BAJA”). Si alguien responde BAJA, desmarca “Aceptó recibir ofertas” en su ficha de inmediato.</li>
+        <li>Envía de a poco desde WhatsApp para evitar bloqueos por spam.</li>
+      </ul>
+    </div>
+    <div id="oList" class="mt-4"></div>`);
+}
+function offerLink() {
+  const id = $('#oProd').value, base = (CFG.STORE_URL || '').replace(/\/$/, '');
+  const p = S.products.find(x => x.id === id);
+  return !p ? base : (p.video_url && !base ? p.video_url : `${base}/?p=${p.id}`);
+}
+function buildSend() {
+  const aud = $('#oAud').value, msg = $('#oMsg').value, link = offerLink();
+  const list = S.customers.filter(c => c.marketing_consent && (aud === 'optin' || S.orders.some(o => o.customer_id === c.id)));
+  S._oList = list.map(c => ({ c, text: msg.replace(/\{nombre\}/g, (c.name || '').split(' ')[0]).replace(/\{link\}/g, link) }));
+  const mails = list.filter(c => c.email).map(c => c.email);
+  $('#oList').innerHTML = `
+    <div class="card p-3 mb-3 text-sm" role="status"><b>${list.length}</b> destinatarios · ${list.filter(c => c.phone).length} con WhatsApp · ${mails.length} con correo
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-soft flex-1" onclick="copyMails()"><span aria-hidden="true">📋</span> Copiar correos (CCO)</button>
+        ${CFG.EMAIL_ENDPOINT ? `<button class="btn btn-brand flex-1" onclick="sendEmails()"><span aria-hidden="true">✉️</span> Enviar correos</button>` : ''}
+      </div></div>
+    ${S._oList.slice(0, 100).map(({ c, text }) => `
+      <div class="card p-3 mb-2 flex items-center gap-2">
+        <div class="flex-1 min-w-0"><div class="font-semibold truncate">${esc(c.name)}</div><div class="text-xs text-gray-700">${esc(c.phone || c.email || '')}</div></div>
+        ${c.phone ? `<a id="w${c.id}" href="${waLink(c.phone, text)}" target="_blank" rel="noopener" onclick="_sent.add('${c.id}');this.textContent='✔ Enviado'" class="btn btn-wa" aria-label="Enviar oferta por WhatsApp a ${esc(c.name)}">${_sent.has(c.id) ? '✔ Enviado' : '💬 WhatsApp'}</a>` : ''}
+      </div>`).join('')}
+    ${list.length > 100 ? '<p class="text-xs text-gray-700">Mostrando los primeros 100. Usa la API de WhatsApp para envíos masivos.</p>' : ''}`;
+  store.save('campaigns', { channel: 'whatsapp', message: msg, audience: aud, sent_count: list.length, product_id: $('#oProd').value || null }).catch(() => {});
+}
+function copyMails() {
+  const m = S._oList.map(x => x.c.email).filter(Boolean).join(', ');
+  navigator.clipboard.writeText(m).then(() => toast('Correos copiados'), () => toast('No se pudo copiar'));
+}
+async function sendEmails() {   // Requiere una Edge Function propia que llame a Resend/SendGrid
+  const items = S._oList.filter(x => x.c.email).map(x => ({ to: x.c.email, name: x.c.name, text: x.text }));
+  try {
+    const r = await fetch(CFG.EMAIL_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: (S.settings.business_name || 'Comercios Cagua') + ' · Oferta', items }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status); toast('Correos enviados');
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ============================== AJUSTES ================================= */
+let _ip = null;
+function vSettings() {
+  const s = S.settings, f = (id, l, v, t = 'text', extra = '') => `<label class="lbl">${l}</label><input id="${id}" type="${t}" class="input" value="${esc(v)}" ${extra}>`;
+  const LEG = [['privacidad', 'Política de Privacidad'], ['terminos', 'Términos y Condiciones'], ['cookies', 'Política de Cookies'], ['reembolsos', 'Política de Reembolsos']];
+  view(`
+    <h2 class="font-bold text-lg mb-2">Configuración del negocio</h2>
+    <div class="card p-4">
+      <div class="flex items-center gap-3">
+        <img id="sLogo" src="${esc(s.logo_url || '')}" class="w-20 h-20 rounded-2xl object-cover bg-gray-200" alt="Logotipo actual">
+        <label class="btn btn-brand cursor-pointer">Subir logotipo<input type="file" accept="image/*" class="sr-only" onchange="pickLogo(this)"></label>
+      </div>
+      ${f('sName', 'Nombre del negocio (se muestra en la tienda)', s.business_name === 'Mi Negocio' ? 'Comercios Cagua' : s.business_name)}
+      <div class="grid grid-cols-2 gap-3 mt-1">
+        <div><label class="lbl">Color principal</label><input id="sC1" type="color" class="input p-1" value="${s.color_primary || '#0f766e'}"></div>
+        <div><label class="lbl">Color acento</label><input id="sC2" type="color" class="input p-1" value="${s.color_accent || '#f59e0b'}"></div>
+      </div>
+      <p id="sCtr" class="text-xs mt-2" role="status"></p>
+    </div>
+    <h3 class="font-bold mt-5 mb-2">Contacto</h3>
+    <div class="card p-4">
+      ${f('sWa', 'WhatsApp del negocio (con código de país)', s.whatsapp, 'tel')}
+      ${f('sCc', 'Código de país por defecto', s.country_code || '58', 'tel')}
+      ${f('sMail', 'Correo de contacto', s.contact_email, 'email')}
+      ${f('sAddr', 'Dirección (retiro en tienda)', s.address)}
+      ${s.whatsapp ? `<a class="text-sm link inline-block py-2" target="_blank" rel="noopener" href="https://wa.me/${esc(normPhone(s.whatsapp, s.country_code))}">Probar enlace directo (se abre en otra pestaña)</a>` : ''}
+    </div>
+    <h3 class="font-bold mt-5 mb-2">⚖️ Datos legales</h3>
+    <div class="card p-4">
+      <p class="text-sm text-gray-800">Aparecen en las páginas de privacidad, términos, cookies y reembolsos de la tienda.</p>
+      ${f('sLegal', 'Razón social o nombre legal', s.legal_name || 'Comercios Cagua')}
+      ${f('sRif', 'RIF', s.rif, 'text', 'autocomplete="off" placeholder="J-12345678-9"')}
+      ${f('sRefund', 'Días para cambios y devoluciones', s.refund_days ?? 7, 'number', 'inputmode="numeric" min="1" max="60"')}
+      <div class="mt-3"><b class="text-sm">Páginas públicas</b><ul class="mt-1">${LEG.map(([k, t]) => `<li><a class="link inline-block py-2" target="_blank" rel="noopener" href="tienda/${k}.html">${t} <span class="sr-only">(se abre en otra pestaña)</span></a></li>`).join('')}</ul></div>
+      <details class="mt-2"><summary class="min-h-[44px] flex items-center font-semibold cursor-pointer">Tus obligaciones como responsable de los datos</summary>
+        <ul class="list-disc pl-5 text-sm space-y-2 mt-2 text-gray-800">
+          <li>Envía ofertas solo a quienes dieron su consentimiento y respeta las bajas (“BAJA”) de inmediato.</li>
+          <li>Atiende en un máximo de 15 días hábiles las solicitudes de acceso, corrección o eliminación de datos.</li>
+          <li>Cada pedido guarda la fecha y versión de los términos aceptados; cada consentimiento guarda su texto y origen.</li>
+          <li>Protege este panel: no compartas el enlace ni tu clave, no entregues el acceso sin un compromiso de confidencialidad y cierra sesión en equipos ajenos. La sesión se cierra sola tras 30 minutos sin actividad.</li>
+          <li>El CSV de clientes contiene datos personales: guárdalo en un lugar seguro y bórralo cuando ya no lo necesites.</li>
+          <li>Conserva los pedidos y comprobantes el tiempo que exija la normativa fiscal; no los borres antes.</li>
+          <li>Nunca pidas ni guardes claves bancarias, PIN ni datos de tarjeta.</li>
+          <li>Si cambias estas políticas, avisa a los clientes y pide al técnico actualizar la versión.</li>
+        </ul>
+        <p class="text-xs text-gray-700 mt-2">Esta lista es orientativa y no sustituye la asesoría de un abogado o contador.</p>
+      </details>
+    </div>
+    <h3 class="font-bold mt-5 mb-2">📱 Pago Móvil</h3>
+    <div class="card p-4">${f('sPmBank', 'Banco', s.pm_bank)}${f('sPmDoc', 'Cédula / RIF', s.pm_id_doc)}${f('sPmPhone', 'Teléfono', s.pm_phone, 'tel')}</div>
+    <h3 class="font-bold mt-5 mb-2">🏦 Transferencia bancaria</h3>
+    <div class="card p-4">${f('sTrBank', 'Banco', s.tr_bank)}${f('sTrAcc', 'Número de cuenta', s.tr_account)}${f('sTrHolder', 'Titular', s.tr_holder)}${f('sTrDoc', 'Cédula / RIF', s.tr_id_doc)}</div>
+    <h3 class="font-bold mt-5 mb-2">Entrega</h3>
+    <div class="card p-4 space-y-3">
+      <label class="flex items-center gap-3"><input id="sPick" type="checkbox" class="w-6 h-6" ${s.accepts_pickup !== false ? 'checked' : ''}> Retiro en tienda</label>
+      <label class="flex items-center gap-3"><input id="sDel" type="checkbox" class="w-6 h-6" ${s.accepts_delivery !== false ? 'checked' : ''}> Envío a domicilio / Delivery</label>
+    </div>
+    <button class="btn btn-brand w-full mt-5" onclick="saveSettings()">Guardar configuración</button>
+    <div id="instBox" class="card p-4 mt-5" ${_ip || /iphone|ipad|ipod/i.test(navigator.userAgent) ? '' : 'hidden'}>
+      <b>📲 Instalar el panel como app</b>
+      <p class="text-sm text-gray-800 mt-1">${_ip ? 'Ábrelo desde tu pantalla de inicio, sin la barra del navegador.' : 'En iPhone: toca Compartir y luego «Añadir a pantalla de inicio».'}</p>
+      ${_ip ? '<button class="btn btn-soft w-full mt-2" onclick="doInstall()">Instalar</button>' : ''}
+    </div>
+    <p class="text-xs text-gray-700 mt-4 text-center">Si no ves el botón de instalar, usa el menú ⋮ del navegador → «Instalar app» o «Añadir a pantalla de inicio».</p>`);
+  const upd = () => {
+    const c1 = $('#sC1').value, r = 1.05 / (lum(c1) + .05);
+    $('#sCtr').textContent = r >= 4.5 ? `✔ El color principal tiene buen contraste sobre fondo blanco (${r.toFixed(1)}:1).` : `⚠ El color principal tiene poco contraste sobre fondo blanco (${r.toFixed(1)}:1). Los precios y enlaces se verán débiles: elige un tono más oscuro (mínimo 4.5:1).`;
+  };
+  $('#sC1').addEventListener('input', upd); upd();
+}
+let _logo = null;
+async function pickLogo(inp) {
+  const f = inp.files[0]; if (!f) return;
+  try { _logo = await uploadImage(f); $('#sLogo').src = _logo; toast('Logotipo listo, recuerda guardar'); } catch (e) { toast('Error: ' + e.message); }
+}
+async function saveSettings() {
+  const v = id => $('#' + id).value.trim();
+  const s = { ...S.settings, business_name: v('sName') || 'Comercios Cagua', logo_url: _logo || S.settings.logo_url || null,
+    color_primary: $('#sC1').value, color_accent: $('#sC2').value, whatsapp: normPhone(v('sWa'), v('sCc')), country_code: v('sCc') || '58',
+    contact_email: v('sMail'), address: v('sAddr'), pm_bank: v('sPmBank'), pm_id_doc: v('sPmDoc'), pm_phone: v('sPmPhone'),
+    tr_bank: v('sTrBank'), tr_account: v('sTrAcc'), tr_holder: v('sTrHolder'), tr_id_doc: v('sTrDoc'),
+    legal_name: v('sLegal') || 'Comercios Cagua', rif: v('sRif'), refund_days: Math.min(60, Math.max(1, parseInt(v('sRefund'), 10) || 7)),
+    accepts_pickup: $('#sPick').checked, accepts_delivery: $('#sDel').checked };
+  if (!s.accepts_pickup && !s.accepts_delivery) return toast('Activa al menos una forma de entrega');
+  try { await store.saveSettings(s); S.settings = s; applyBrand(); toast(S.needsSql ? 'Guardado, pero falta ejecutar schema_legal.sql para los datos legales' : 'Configuración guardada'); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+
+/* ===================== INSTALAR COMO APP + SERVICE WORKER ================ */
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _ip = e; if (S.tab === 'settings') { vSettings(); a11y($('#view')); } });
+async function doInstall() { if (!_ip) return; _ip.prompt(); await _ip.userChoice.catch(() => {}); _ip = null; if (S.tab === 'settings') { vSettings(); a11y($('#view')); } }
+window.addEventListener('appinstalled', () => { _ip = null; });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+/* ============================ LOGIN + ARRANQUE ========================== */
+function loginScreen() {
+  $('nav').classList.add('hidden');
+  view(`<div class="card p-6 mt-10"><h2 class="font-bold text-xl mb-2">Ingresar</h2>
+    <p class="text-sm text-gray-800">Acceso restringido al personal autorizado de Comercios Cagua.</p>
+    <form onsubmit="event.preventDefault();doLogin()" novalidate>
+    <label class="lbl">Correo</label><input id="lE" type="email" class="input" autocomplete="username">
+    <label class="lbl">Contraseña</label><input id="lP" type="password" class="input" autocomplete="current-password">
+    <button class="btn btn-brand w-full mt-4" type="submit">Entrar</button></form>
+    <p class="text-xs text-gray-700 mt-3">Este panel trata datos personales de clientes. <a class="link" href="tienda/privacidad.html" target="_blank" rel="noopener">Política de privacidad</a></p></div>`);
+  a11y($('#view'));
+}
+async function doLogin() {
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lE').value.trim(), password: $('#lP').value });
+  if (error) { $('#lP').setAttribute('aria-invalid', 'true'); return toast('Correo o contraseña incorrectos'); }
+  start();
+}
+$('#btnLogout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+/* Cierre de sesión por inactividad (30 min): protege los datos si dejas el teléfono abierto */
+let _idle = null;
+function armIdle() {
+  const reset = () => { clearTimeout(_idle); _idle = setTimeout(async () => { try { await sb.auth.signOut(); } catch {} location.reload(); }, 30 * 60 * 1000); };
+  ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(ev => addEventListener(ev, reset, { passive: true })); reset();
+}
+
+async function start() {
+  try {
+    if (sb) {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) return loginScreen();
+      $('#btnLogout').classList.remove('hidden'); armIdle();
+    }
+    $('nav').classList.remove('hidden');
+    await loadAll(); go('home');
+  } catch (e) { view(`<div class="card p-4 text-red-800" role="alert">Error al cargar: ${esc(e.message)}</div>`); }
+}
+start();
+</script>
+</body>
+</html>

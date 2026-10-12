@@ -8,7 +8,7 @@ window.APP_CONFIG = {
   CLOUDINARY_UPLOAD_PRESET: "",
 
   // URL pública de la tienda (se usa para los links de ofertas)
-  STORE_URL: "   STORE_URL: "https://proyectos69.github.io/mi-tienda/tienda",",
+STORE_URL: "https://proyectos69.github.io/mi-tienda/tienda",
 
   // Opcional: endpoint (Supabase Edge Function) que envía correos con Resend/SendGrid
   EMAIL_ENDPOINT: ""

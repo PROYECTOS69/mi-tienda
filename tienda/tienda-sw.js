@@ -1,4 +1,4 @@
-/* Service worker de la TIENDA (alcance: carpeta /tienda/).
+lo/* Service worker de la TIENDA (alcance: carpeta /tienda/).
    Red primero con copia de respaldo sin conexión. Solo archivos del propio sitio:
    el catálogo y los pedidos (Supabase) nunca se guardan en la caché. */
 const VERSION = 'cc-tienda-v5';

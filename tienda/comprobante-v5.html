@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comprobante de pedido</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f766e">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="icon" type="image/png" href="tienda-icon-192.png">
+<style>
+:root{--brand:#0f766e;--ink:#1f2937;--muted:#4b5563;--line:#d1d5db;--bg:#f3f4f6;--focus:#1d4ed8}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.skip{position:absolute;left:-999px;top:0;background:#fff;color:#000;padding:.75rem 1rem;z-index:100;border-radius:0 0 .5rem 0}
+.skip:focus{left:0}
+.wrap{max-width:40rem;margin:0 auto;padding:1rem}
+.sheet{background:#fff;border:1px solid var(--line);border-radius:16px;padding:1.25rem 1.25rem 1rem}
+h1{font-size:1.45rem;line-height:1.25;margin:.1rem 0 .15rem}
+h2{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:1.3rem 0 .35rem}
+.biz{font-weight:700;color:var(--brand);margin:0}
+.small{font-size:.9rem;color:var(--muted)}
+.code{display:inline-block;font-weight:700;font-size:1.05rem;border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:.15rem .6rem;margin:.4rem 0}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:.25rem .9rem}
+dt{color:var(--muted)}
+dd{margin:0;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{padding:.5rem .35rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.8rem;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap}
+tfoot td{border-bottom:0;font-weight:700;font-size:1.1rem;padding-top:.7rem}
+.status{display:inline-block;font-weight:600;border-radius:999px;padding:.1rem .7rem;background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7}
+.status.pend{background:#fffbeb;color:#92400e;border-color:#fcd34d}
+.status.canc{background:#fef2f2;color:#991b1b;border-color:#fca5a5}
+.legal{margin-top:1.2rem;padding-top:.8rem;border-top:1px dashed var(--line);font-size:.85rem;color:var(--muted)}
+.sign{display:none;margin-top:2.2rem;font-size:.85rem;color:var(--muted)}
+.sign div{display:inline-block;width:46%;border-top:1px solid #000;padding-top:.2rem;text-align:center;margin-right:3%}
+.btns{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+.btn{flex:1 1 12rem;min-height:48px;border-radius:12px;border:2px solid var(--brand);background:var(--brand);color:#fff;font:600 1rem system-ui,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:.4rem 1rem}
+.btn.soft{background:#fff;color:var(--brand)}
+a:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.msg{padding:1.2rem;text-align:center}
+.note{background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:.5rem .8rem;font-size:.9rem;margin-bottom:.8rem}
+@media print{
+  body{background:#fff;font-size:12pt}
+  .wrap{max-width:none;padding:0}
+  .sheet{border:0;padding:0}
+  .btns,.skip,.note{display:none!important}
+  .sign{display:block}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+<main id="contenido" class="wrap" tabindex="-1">
+  <div id="root" aria-live="polite"><div class="sheet msg">Cargando tu comprobante…</div></div>
+</main>
+<script src="../config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var CFG = window.APP_CONFIG || {};
+  var root = document.getElementById('root');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+  var money = function (n) { return '$' + Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var PAY = { pago_movil: 'Pago Móvil', transferencia: 'Transferencia bancaria', whatsapp: 'Acuerdo por WhatsApp' };
+  var ST = { pendiente: ['Pendiente de confirmar el pago', 'pend'], pagado: ['Pago confirmado', ''], enviado: ['Enviado', ''], entregado: ['Entregado', ''], cancelado: ['Cancelado', 'canc'] };
+  var id = (new URLSearchParams(location.search).get('o') || '').trim().toLowerCase();
+  var KEY = 'mk_rc_' + id;
+  var lsGet = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+  var lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+  function fail(title, text, retry) {
+    root.innerHTML = '<div class="sheet msg" role="alert"><h1>' + esc(title) + '</h1><p>' + esc(text) + '</p><div class="btns">' +
+      (retry ? '<button class="btn" type="button" id="retry">Reintentar</button>' : '') +
+      '<a class="btn soft" href="./">Ir a la tienda</a></div></div>';
+    var b = document.getElementById('retry'); if (b) b.addEventListener('click', load);
+  }
+
+  function demoReceipt() {   // modo demo: datos del teléfono
+    var o = (lsGet('mk_orders', []) || []).filter(function (x) { return String(x.id).toLowerCase() === id; })[0];
+    if (!o) return null;
+    var s = lsGet('mk_settings', {}) || {};
+    return { id: o.id, code: String(o.id).slice(0, 8).toUpperCase(), created_at: o.created_at, status: o.status, items: o.items || [], total: o.total,
+      delivery_type: o.delivery_type, delivery_address: o.delivery_address || '', payment_method: o.payment_method, payment_ref: o.payment_ref,
+      customer_name: o.customer_name, phone_tail: String(o.customer_phone || '').replace(/\D/g, '').slice(-4),
+      business: { name: s.business_name, legal_name: s.legal_name, rif: s.rif, address: s.address, whatsapp: s.whatsapp, email: s.contact_email, phone: s.contact_phone, refund_days: s.refund_days } };
+  }
+
+  function render(r, cached) {
+    var b = r.business || {}, items = Array.isArray(r.items) ? r.items : [];
+    var st = ST[r.status] || [r.status || '', ''];
+    var when = r.created_at ? new Date(r.created_at).toLocaleString('es-VE', { dateStyle: 'long', timeStyle: 'short' }) : '';
+    var pay = PAY[r.payment_method] || r.payment_method || 'Sin indicar';
+    var rows = items.map(function (i) {
+      var q = Number(i.qty || 1), p = Number(i.price || 0);
+      return '<tr><td>' + esc(i.name || 'Producto') + '</td><td class="n">' + q + '</td><td class="n">' + money(p) + '</td><td class="n">' + money(q * p) + '</td></tr>';
+    }).join('');
+    var contact = [b.phone, b.email].filter(Boolean).map(esc).join(' · ');
+    var nm = b.legal_name && b.name && b.legal_name !== b.name ? esc(b.name) + ' <span class="small">(' + esc(b.legal_name) + ')</span>' : esc(b.name || b.legal_name || 'Tienda');
+    document.title = 'Comprobante de pedido #' + (r.code || '');
+    root.innerHTML =
+      (cached ? '<div class="note" role="status">Sin buena señal: se muestra la última copia guardada en este teléfono. El estado puede haber cambiado.</div>' : '') +
+      '<article class="sheet" aria-labelledby="t">' +
+      '<p class="biz">' + nm + '</p>' +
+      (b.rif ? '<p class="small" style="margin:0">RIF: ' + esc(b.rif) + '</p>' : '') +
+      (b.address ? '<p class="small" style="margin:0">' + esc(b.address) + '</p>' : '') +
+      '<h1 id="t" style="margin-top:.9rem">Comprobante de pedido</h1>' +
+      '<span class="code">Pedido #' + esc(r.code) + '</span>' +
+      '<dl><dt>Fecha</dt><dd>' + esc(when) + '</dd><dt>Estado</dt><dd><span class="status ' + st[1] + '">' + esc(st[0]) + '</span></dd></dl>' +
+      '<h2>Cliente</h2><dl><dt>Nombre</dt><dd>' + esc(r.customer_name) + '</dd>' + (r.phone_tail ? '<dt>Teléfono</dt><dd>terminado en ' + esc(r.phone_tail) + '</dd>' : '') + '</dl>' +
+      '<h2>Entrega</h2><dl><dt>Modalidad</dt><dd>' + (r.delivery_type === 'delivery' ? 'Envío a domicilio' : 'Retiro en tienda') + '</dd>' +
+      (r.delivery_type === 'delivery' && r.delivery_address ? '<dt>Dirección</dt><dd>' + esc(r.delivery_address) + '</dd>' : '') + '</dl>' +
+      '<h2>Pago</h2><dl><dt>Forma de pago</dt><dd>' + esc(pay) + '</dd>' + (r.payment_ref ? '<dt>Referencia</dt><dd>' + esc(r.payment_ref) + '</dd>' : '') + '</dl>' +
+      '<h2>Productos</h2><table><thead><tr><th scope="col">Producto</th><th scope="col" class="n">Cant.</th><th scope="col" class="n">Precio</th><th scope="col" class="n">Subtotal</th></tr></thead><tbody>' + rows +
+      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">' + money(r.total) + '</td></tr></tfoot></table>' +
+      '<p class="small" style="margin:.2rem 0 0">Precios en dólares (USD).</p>' +
+      '<div class="sign"><div>Entregado por</div><div>Recibido conforme</div></div>' +
+      '<div class="legal"><p style="margin:0 0 .3rem">Este comprobante confirma el pedido realizado. <strong>No es una factura fiscal.</strong> Guárdalo: lo necesitarás para cambios o reembolsos' +
+      (b.refund_days ? ' (plazo de ' + esc(b.refund_days) + ' días, según la política de reembolsos)' : '') + '.</p>' +
+      (contact ? '<p style="margin:0">Contacto: ' + contact + '</p>' : '') + '</div>' +
+      '<div class="btns"><button class="btn" type="button" id="pr">Imprimir o guardar como PDF</button><a class="btn soft" href="./">Volver a la tienda</a></div>' +
+      '</article>';
+    document.getElementById('pr').addEventListener('click', function () { window.print(); });
+    document.getElementById('contenido').focus({ preventScroll: true });
+  }
+
+  function load() {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return fail('Enlace no válido', 'Revisa el enlace de tu comprobante o escríbenos con tu código de pedido.');
+    if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
+      var d = demoReceipt(); return d ? render(d, false) : fail('Pedido no encontrado', 'En modo demo, el pedido solo existe en el teléfono donde se hizo.');
+    }
+    var ctl = new AbortController(), t = setTimeout(function () { ctl.abort(); }, 15000);
+    fetch(CFG.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/rpc/get_order_receipt', {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', apikey: CFG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + CFG.SUPABASE_ANON_KEY },
+      body: JSON.stringify({ p_order: id })
+    }).then(function (res) {
+      clearTimeout(t);
+      if (res.status === 404 || res.status === 400) throw { missingFn: true };
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (r) {
+      if (!r) return fail('Pedido no encontrado', 'Revisa el enlace o escríbenos con tu código de pedido.');
+      lsSet(KEY, r); render(r, false);
+    }).catch(function (e) {
+      clearTimeout(t);
+      if (e && e.missingFn) return fail('Comprobante no disponible', 'La tienda aún no tiene activado el comprobante. Escríbenos con tu código de pedido.');
+      var c = lsGet(KEY, null);
+      if (c) return render(c, true);
+      fail('Sin conexión', 'No pudimos cargar tu comprobante. Revisa tu señal e inténtalo de nuevo.', true);
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
